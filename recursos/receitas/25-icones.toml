@@ -6,12 +6,13 @@ requer = ["10"]
 afetada_por = ["icones", "paleta", "modo"]
 
 # o Papirus vem do apt (etapa 10) e o Adwaita ja esta no sistema; so o Tela
-# precisa ser baixado e instalado
+# precisa ser baixado e instalado. O install.sh dele roda aqui, entao o
+# repositorio fica num commit fixo (TELA_COMMIT e QOGIR_COMMIT no projeto.py)
 [[passo]]
 tipo = "git"
 se = "icones == tela"
 url = "https://github.com/vinceliuice/Tela-icon-theme.git"
-ref = "master"
+ref = "@@tela_commit@@"
 destino = "@@fontes@@/Tela-icon-theme"
 
 [[passo]]
@@ -36,7 +37,7 @@ echo "icones $CTX_ICONES_TEMA instalados"
 tipo = "git"
 se = "icones == qogir"
 url = "https://github.com/vinceliuice/Qogir-icon-theme.git"
-ref = "master"
+ref = "@@qogir_commit@@"
 destino = "@@fontes@@/Qogir-icon-theme"
 
 [[passo]]

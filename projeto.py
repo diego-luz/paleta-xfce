@@ -53,27 +53,46 @@ PALETAS = {
 # paleta -> como o tema chega na maquina
 #   release:    baixa o .tar.xz pronto do GitHub (nome do arquivo por modo)
 #   instalador: clona e roda themes/install.sh (nome do tema e do repositorio)
+#
+# Tudo com versao fixa: o .tar.xz de um release conferido pelo SHA-256, e os
+# repositorios num commit (o install.sh deles roda aqui). Para atualizar: no
+# release, troque a versao e recalcule os hashes (sha256sum do arquivo baixado,
+# o Nordic nao publica checksums); no repositorio, pegue o commit novo com
+# `git ls-remote URL HEAD`, leia o que mudou e troque o "commit".
 TEMAS = {
     "nord": {
         "metodo": "release",
-        "url": "https://github.com/EliverLara/Nordic/releases/latest/download/",
+        "url": "https://github.com/EliverLara/Nordic/releases/download/v2.2.0/",
         # o Nordic nao tem variante compacta; o claro chama-se Polar
         "arquivo": {"escuro": "Nordic-darker.tar.xz", "claro": "Nordic-Polar.tar.xz"},
+        "sha256": {
+            "escuro": "49115292bfa15aaa9aea661c7468b48918708a6940e4b8058ac46f3dbb81c626",
+            "claro": "9b8dff73ee9de5649723e65ae140e50a51ce31eb1fdaa8487c5fd8c202a7f05e",
+        },
         "nome": {"escuro": "Nordic-darker", "claro": "Nordic-Polar"},
     },
     "gruvbox": {
         "metodo": "instalador",
         "repo": "https://github.com/Fausto-Korpsvart/Gruvbox-GTK-Theme.git",
+        "commit": "578cd220b5ff6e86b078a6111d26bb20ec8c733f",
         "pasta": "Gruvbox-GTK-Theme",
         "nome": "Gruvbox",
     },
     "everforest": {
         "metodo": "instalador",
         "repo": "https://github.com/Fausto-Korpsvart/Everforest-GTK-Theme.git",
+        "commit": "9b8be4d6648ae9eaae3dd550105081f8c9054825",
         "pasta": "Everforest-GTK-Theme",
         "nome": "Everforest",
     },
 }
+
+# icones baixados, cada um num commit fixo (atualizar como os temas acima)
+TELA_COMMIT = "a1fffc5bfab716bd022dd228ee96fe3965cdb33d"
+QOGIR_COMMIT = "c633057ba0d27a504b3255144071c9691ed0264a"
+
+# fora da pasta pessoal as receitas nao criam nada; o desfazer nao apaga la
+APAGAVEIS_FORA_DE_CASA: set[str] = set()
 
 # a cor do Tela que mais se aproxima de cada paleta (o instalador dele aceita
 # nord, orange, green, entre outras)
@@ -135,12 +154,13 @@ def contexto(cfg: dict[str, str]) -> dict[str, str]:
         gtk_tema = tema["nome"][modo]
         tema_arquivo = tema["arquivo"][modo]
         tema_url = tema["url"] + tema_arquivo
-        repo = pasta = ""
+        tema_sha256 = tema["sha256"][modo]
+        repo = pasta = commit = ""
     else:
         # o instalador monta o nome: Gruvbox-Dark, Gruvbox-Dark-Compact...
         gtk_tema = tema["nome"] + ("-Dark" if escuro else "-Light") + ("-Compact" if compacto else "")
-        tema_arquivo = tema_url = ""
-        repo, pasta = tema["repo"], tema["pasta"]
+        tema_arquivo = tema_url = tema_sha256 = ""
+        repo, pasta, commit = tema["repo"], tema["pasta"], tema["commit"]
 
     fonte = FONTES.get(cfg.get("fonte", ""), "Inter")
     icones = cfg.get("icones", "papirus")
@@ -165,7 +185,11 @@ def contexto(cfg: dict[str, str]) -> dict[str, str]:
         "tema_metodo": tema["metodo"],
         "tema_url": tema_url,
         "tema_arquivo": tema_arquivo,
+        "tema_sha256": tema_sha256,
         "tema_repo": repo,
+        "tema_commit": commit,
+        "tela_commit": TELA_COMMIT,
+        "qogir_commit": QOGIR_COMMIT,
         "tema_pasta": pasta,
         "tema_nome_base": tema.get("nome") if isinstance(tema.get("nome"), str) else gtk_tema,
         "tema_cor_install": "dark" if escuro else "light",

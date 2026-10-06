@@ -441,6 +441,7 @@ async function desenharPreviaApagar(){
   if (sai.length) lista("Será apagado", sai);
   else caixa.appendChild(criar("b", "", "Nada instalado pelo projeto foi encontrado"));
   lista("Fica instalado", p.ficam.map(f => `${f.nome}: ${f.motivo}`));
+  lista("Confira e apague à mão, se for do projeto (fora da pasta pessoal, o desfazer não apaga sozinho)", p.conferir || []);
   if (p.origem === "historico")
     caixa.appendChild(criar("p", "dica", "Esta instalação é anterior ao diário de alterações; "
       + "a lista de pacotes veio do histórico do apt."));

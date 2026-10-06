@@ -5,7 +5,8 @@ titulo = "Tema das janelas na paleta escolhida"
 requer = ["10"]
 afetada_por = ["paleta", "modo", "compacto"]
 
-# Nord: o autor publica o tema pronto, entao baixar e extrair basta
+# Nord: o autor publica o tema pronto, entao baixar e extrair basta. Versao e
+# SHA-256 fixos no projeto.py (TEMAS), conferidos antes de extrair
 [[passo]]
 tipo = "script"
 se = "tema_metodo == release"
@@ -22,17 +23,20 @@ mkdir -p "$HOME/.themes"
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 curl -fsSL -o "$tmp" "$CTX_TEMA_URL"
-tar -xJf "$tmp" -C "$HOME/.themes"
+echo "$CTX_TEMA_SHA256  $tmp" | sha256sum -c --quiet - \
+  || { echo "o tema baixado nao confere com o esperado; nada foi instalado" >&2; exit 1; }
+tar -xJf "$tmp" -C "$HOME/.themes" --no-same-owner
 [ -d "$destino" ] || { echo "o pacote nao trouxe a pasta $CTX_GTK_TEMA" >&2; exit 1; }
 echo "tema $CTX_GTK_TEMA instalado"
 '''
 
-# Gruvbox e Everforest: repositorio do mesmo autor, compilado com sassc
+# Gruvbox e Everforest: repositorio do mesmo autor, compilado com sassc; o
+# install.sh roda aqui, entao o repositorio fica num commit fixo (projeto.py)
 [[passo]]
 tipo = "git"
 se = "tema_metodo == instalador"
 url = "@@tema_repo@@"
-ref = "master"
+ref = "@@tema_commit@@"
 destino = "@@fontes@@/@@tema_pasta@@"
 
 [[passo]]

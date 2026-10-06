@@ -206,6 +206,7 @@ def construir() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     caminhos.preparar()
+    caminhos.proteger_codigo()
     parser = construir()
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):

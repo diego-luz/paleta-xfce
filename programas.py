@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -116,10 +117,16 @@ def arrastaria(pacotes: list[str]) -> list[str]:
 # o apt escreve o progresso em linhas "dlstatus:" e "pmstatus:" na saida; a
 # pagina tira dali a barra e o pacote da vez e esconde essas linhas do log
 PROGRESSO_APT = ["-o", "APT::Status-Fd=1"]
+# arquivo de configuracao mexido pelo usuario: fica o dele, sem perguntar
+APT_SEM_PERGUNTAS = ["-o", "Dpkg::Options::=--force-confdef",
+                     "-o", "Dpkg::Options::=--force-confold"]
+# o sudo limpa o ambiente: o DEBIAN_FRONTEND precisa ir por dentro
+COMO_ROOT = ["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive"]
 
 
 def comando_instalar(pacotes: list[str]) -> list[str]:
-    return ["apt-get", *PROGRESSO_APT, "install", "-y", "--no-install-recommends", *pacotes]
+    return ["apt-get", *PROGRESSO_APT, *APT_SEM_PERGUNTAS, "install", "-y",
+            "--no-install-recommends", *pacotes]
 
 
 def instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
@@ -128,10 +135,29 @@ def instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
     Um item pode levar pacotes junto ("junto") e pedir um roteiro de
     configuracao depois do apt ("depois"), como o Docker rootless.
     """
+    try:
+        with caminhos.trava():
+            return _instalar(pacotes, diz)
+    except caminhos.Ocupado as erro:
+        diz(f"{erro}; espere terminar")
+        return 1
+
+
+def remover(pacotes: list[str], diz: Callable[[str], None]) -> int:
+    try:
+        with caminhos.trava():
+            diz("removendo: " + ", ".join(pacotes))
+            return _correr([*COMO_ROOT, *comando_remover(pacotes)], diz)
+    except caminhos.Ocupado as erro:
+        diz(f"{erro}; espere terminar")
+        return 1
+
+
+def _instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
     for pedido in fontes_necessarias(pacotes):
         diz(f"habilitando a fonte de {pedido['nome']}: {pedido['fonte']}")
         roteiro = caminhos.ARQUIVOS / "fonte-externa.sh"
-        codigo = _correr(["sudo", "-n", "bash", str(roteiro), pedido["fonte"]], diz)
+        codigo = _correr([*COMO_ROOT, "bash", str(roteiro), pedido["fonte"]], diz)
         if codigo != 0:
             diz("nao consegui habilitar a fonte; nada foi instalado")
             return codigo
@@ -141,8 +167,7 @@ def instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
     for nome in pacotes:
         todos += [p for p in tabela.get(nome, {}).get("junto", []) if p not in todos]
     diz("instalando: " + ", ".join(todos))
-    codigo = _correr(["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive",
-                      *comando_instalar(todos)], diz)
+    codigo = _correr([*COMO_ROOT, *comando_instalar(todos)], diz)
     if codigo != 0:
         return codigo
 
@@ -153,19 +178,28 @@ def instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
             continue
         diz(f"configurando {tabela[nome].get('nome', nome)}")
         # roda como o usuario: o que o roteiro configura e dele, e ele mesmo usa
-        # sudo -n nos passos de sistema
-        codigo = _correr(["bash", str(caminhos.ARQUIVOS / roteiro)], diz)
+        # sudo -n nos passos de sistema; roteiro sem sudo roda fora da senha ja
+        # confirmada (sessao nova), como os trechos das receitas
+        arquivo = caminhos.ARQUIVOS / roteiro
+        try:
+            usa_sudo = re.search(r"\bsudo\b", arquivo.read_text()) is not None
+        except OSError:
+            usa_sudo = False
+        codigo = _correr(["bash", str(arquivo)], diz, sessao_nova=not usa_sudo)
         if codigo != 0:
             return codigo
     return 0
 
 
-def _correr(argumentos: list[str], diz: Callable[[str], None]) -> int:
+def _correr(argumentos: list[str], diz: Callable[[str], None], sessao_nova: bool = False) -> int:
+    ambiente = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "TERM": "dumb"}
+    if sessao_nova:
+        ambiente["SUDO_ASKPASS"] = "/bin/false"
     try:
         proc = subprocess.Popen(
             argumentos, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL, text=True, bufsize=1,
-            env={**os.environ, "DEBIAN_FRONTEND": "noninteractive", "TERM": "dumb"})
+            stdin=subprocess.DEVNULL, text=True, bufsize=1, env=ambiente,
+            start_new_session=sessao_nova)
         assert proc.stdout is not None
         for linha in proc.stdout:
             diz(linha.rstrip("\n"))

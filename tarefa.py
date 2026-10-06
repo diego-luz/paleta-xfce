@@ -89,7 +89,7 @@ class Tarefa:
     def processo(self, rotulo: str, argumentos: list[str], root: bool = False) -> bool:
         """Roda um comando externo, repassando a saida linha a linha."""
         if root:
-            argumentos = ["sudo", "-n", *argumentos]
+            argumentos = ["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", *argumentos]
         if not self._abrir(rotulo):
             return False
 

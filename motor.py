@@ -74,6 +74,14 @@ def condicao_atende(expressao: str, ctx: dict[str, str]) -> bool:
 # motor
 # --------------------------------------------------------------------------
 
+# arquivo de configuracao mexido pelo usuario: fica o dele, sem perguntar
+APT_SEM_PERGUNTAS = ["-o", "Dpkg::Options::=--force-confdef",
+                     "-o", "Dpkg::Options::=--force-confold"]
+
+# ref de git com 40 hexadecimais e um commit fixo (ver passo_git)
+_COMMIT = re.compile(r"[0-9a-f]{40}")
+
+
 class ErroDePasso(Exception):
     pass
 
@@ -101,7 +109,9 @@ class Motor:
     def _executa(self, argumentos: list[str], root: bool = False,
                  entrada: str | None = None) -> int:
         if root:
-            argumentos = ["sudo", "-n", *argumentos]
+            # o sudo limpa o ambiente: o DEBIAN_FRONTEND precisa ir por dentro,
+            # senao um pacote com pergunta (debconf) espera para sempre
+            argumentos = ["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", *argumentos]
         if self.simular:
             self.diz("  [simulacao] " + " ".join(shlex.quote(a) for a in argumentos))
             return 0
@@ -109,6 +119,8 @@ class Motor:
         try:
             proc = subprocess.run(
                 argumentos, input=entrada, capture_output=True, text=True,
+                # sem entrada, nada pode ficar esperando o teclado
+                stdin=subprocess.DEVNULL if entrada is None else None,
                 env={**os.environ, "DEBIAN_FRONTEND": "noninteractive", "TERM": "dumb"},
             )
         except OSError as erro:
@@ -140,8 +152,8 @@ class Motor:
             return
         self.diz(f"  instalando: {', '.join(faltam)}")
         antes = sistema.pacotes_instalados()
-        codigo = self._executa(["apt-get", "install", "-y", "--no-install-recommends",
-                                *faltam], root=True)
+        codigo = self._executa(["apt-get", *APT_SEM_PERGUNTAS, "install", "-y",
+                                "--no-install-recommends", *faltam], root=True)
         if codigo != 0:
             raise ErroDePasso(f"apt-get falhou ao instalar {', '.join(faltam)}")
         # so os que faltavam: o que ja existia na maquina nunca entra no remover.
@@ -193,10 +205,7 @@ class Motor:
             self.diz(f"  [simulacao] escreveria {destino}")
             return
         estado.copia_de_seguranca(destino)
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        destino.write_text(conteudo)
-        if p.get("modo"):
-            destino.chmod(int(str(p["modo"]), 8))
+        caminhos.escrever(destino, conteudo, int(str(p["modo"]), 8) if p.get("modo") else None)
         self._anotar("alterado" if existia else "criado", caminho=str(destino))
         self.diz(f"  escrito {destino}")
 
@@ -215,22 +224,35 @@ class Motor:
         destino.parent.mkdir(parents=True, exist_ok=True)
         existia = destino.exists()
         texto = destino.read_text() if existia else ""
-        texto = re.sub(re.escape(abre) + r".*?" + re.escape(fecha), "", texto, flags=re.S)
+        # marcas ancoradas na linha inteira: "# fim x" nao pode casar dentro do
+        # bloco de outro projeto com nome parecido no mesmo arquivo
+        texto = re.sub(r"^" + re.escape(abre) + r"$.*?^" + re.escape(fecha) + r"$", "", texto,
+                       flags=re.S | re.M)
         texto = texto.rstrip() + f"\n\n{abre}\n{conteudo.strip()}\n{fecha}\n"
-        destino.write_text(texto)
+        caminhos.escrever(destino, texto)
         # so o bloco sai no desfazer; o que a pessoa escreveu no arquivo depois fica
         self._anotar("bloco", caminho=str(destino), marca=marca,
                      comentario=p.get("comentario", ""), arquivo_novo=not existia)
         self.diz(f"  bloco '{marca}' em {destino}")
 
     def passo_git(self, p: dict) -> None:
+        """Clona ou atualiza um repositorio.
+
+        Para codigo de terceiros que vai rodar aqui (instalador de tema, de
+        icones), o ref deve ser um commit (40 hexadecimais), nao um ramo: o que
+        roda e sempre o que foi conferido. Para atualizar, pegue o commit novo
+        com `git ls-remote URL HEAD`, leia o que mudou e troque o ref.
+        """
         destino = self._caminho(p["destino"])
         url = resolver(p["url"], self.ctx)
         ref = resolver(p.get("ref", "HEAD"), self.ctx)
         if self.simular:
-            self.diz(f"  [simulacao] clonaria {url} em {destino}")
+            self.diz(f"  [simulacao] clonaria {url} ({ref}) em {destino}")
             return
         destino.parent.mkdir(parents=True, exist_ok=True)
+        if _COMMIT.fullmatch(ref):
+            self._git_commit(destino, url, ref)
+            return
         if (destino / ".git").is_dir():
             self.diz(f"  atualizando {destino.name}")
             self._executa(["git", "-C", str(destino), "remote", "set-url", "origin", url])
@@ -244,6 +266,30 @@ class Motor:
             if self._executa(["git", "clone", "--depth", "1", url, str(destino)]) != 0:
                 raise ErroDePasso(f"nao consegui clonar {url}")
         self._anotar("criado", caminho=str(destino))
+
+    def _git_commit(self, destino: Path, url: str, commit: str) -> None:
+        """Busca so aquele commit (o GitHub aceita fetch por hash) e confere."""
+        novo = not (destino / ".git").is_dir()
+        if novo:
+            self.diz(f"  clonando {destino.name} em {commit[:12]}")
+            if destino.exists():
+                shutil.rmtree(destino, ignore_errors=True)
+            if self._executa(["git", "init", "-q", str(destino)]) != 0:
+                raise ErroDePasso(f"nao consegui criar {destino}")
+            self._executa(["git", "-C", str(destino), "remote", "add", "origin", url])
+        else:
+            self.diz(f"  atualizando {destino.name} para {commit[:12]}")
+            self._executa(["git", "-C", str(destino), "remote", "set-url", "origin", url])
+        if self._executa(["git", "-C", str(destino), "fetch", "-q", "--depth", "1",
+                          "origin", commit]) != 0 or \
+           self._executa(["git", "-C", str(destino), "checkout", "-q", "-f", "FETCH_HEAD"]) != 0:
+            raise ErroDePasso(f"nao consegui buscar {url} no commit {commit[:12]}")
+        atual = subprocess.run(["git", "-C", str(destino), "rev-parse", "HEAD"],
+                               capture_output=True, text=True).stdout.strip()
+        if atual != commit:
+            raise ErroDePasso(f"{destino.name} ficou em {atual[:12] or '?'}, esperava {commit[:12]}")
+        if novo:
+            self._anotar("criado", caminho=str(destino))
 
     def passo_comando(self, p: dict) -> None:
         argumentos = [str(x) for x in resolver(p["argumentos"], self.ctx)]
@@ -270,9 +316,16 @@ class Motor:
                 ambiente[f"CTX_{chave.upper()}"] = str(valor)
         # as funcoes d3_antes, d3_gsettings... que anotam no diario (ver diario.py)
         ambiente.update(diario.ambiente_shell(self.receita, self.anotar))
+        # so o trecho que chama o sudo ele mesmo usa a senha ja confirmada (que
+        # vale para este terminal); os outros rodam fora dele, numa sessao nova,
+        # entao um instalador de terceiros que tente "sudo" por conta propria falha
+        usa_sudo = re.search(r"\bsudo\b", corpo) is not None
+        if not usa_sudo:
+            ambiente["SUDO_ASKPASS"] = "/bin/false"
         estado.registrar("+ shell:\n" + corpo)
         proc = subprocess.run(["bash", "-euo", "pipefail", "-c", diario.FUNCOES_SHELL + corpo],
-                              capture_output=True, text=True, env=ambiente)
+                              capture_output=True, text=True, env=ambiente,
+                              stdin=subprocess.DEVNULL, start_new_session=not usa_sudo)
         for linha in (proc.stdout or "").splitlines():
             self.diz("  " + linha)
         if proc.returncode != 0:
@@ -337,8 +390,7 @@ class Motor:
             return
         existia = arquivo.exists()
         estado.copia_de_seguranca(arquivo)
-        arquivo.parent.mkdir(parents=True, exist_ok=True)
-        arquivo.write_text(conteudo)
+        caminhos.escrever(arquivo, conteudo)
         self._anotar("alterado" if existia else "criado", caminho=str(arquivo))
         self.diz(f"  inicializacao automatica: {ident}")
 
