@@ -1,0 +1,14 @@
+[modulo]
+id = "00"
+nome = "backup"
+titulo = "Copia de seguranca do que existe hoje"
+afetada_por = []
+
+[[passo]]
+tipo = "backup"
+dizer = "guardando a configuracao atual"
+caminhos = [
+  "~/.config/xfce4",
+  "~/.config/gtk-3.0",
+  "~/.gtkrc-2.0",
+]

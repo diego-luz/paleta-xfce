@@ -1,0 +1,46 @@
+[modulo]
+id = "36"
+nome = "terminal-acoes"
+titulo = "Novo terminal no clique direito"
+afetada_por = []
+
+# O clique direito da barra (e do menu) mostra as Actions do .desktop, e o do
+# xfce4-terminal so traz Preferencias. A copia em ~/.local/share/applications
+# vale no lugar da do sistema e ganha nova janela e nova aba.
+[[passo]]
+tipo = "script"
+dizer = "pondo nova janela e nova aba no clique direito do terminal"
+tolera_falha = true
+corpo = '''
+origem=/usr/share/applications/xfce4-terminal.desktop
+[ -f "$origem" ] || { echo "xfce4-terminal nao instalado"; exit 0; }
+dest="$HOME/.local/share/applications/xfce4-terminal.desktop"
+d3_pasta "$HOME/.local/share/applications"
+d3_antes "$dest"
+mkdir -p "${dest%/*}"
+# so a secao principal; as acoes sao escritas abaixo
+sed -n '/^\[Desktop Entry\]/,/^\[Desktop Action/{/^\[Desktop Action/d;/^Actions=/d;p}' "$origem" > "$dest"
+cat >> "$dest" <<'EOF'
+Actions=new-window;new-tab;preferences;
+
+[Desktop Action new-window]
+Name=New Window
+Name[pt_BR]=Nova janela
+Name[pt]=Nova janela
+Exec=xfce4-terminal --window
+
+[Desktop Action new-tab]
+Name=New Tab
+Name[pt_BR]=Nova aba
+Name[pt]=Nova aba
+Exec=xfce4-terminal --tab
+
+[Desktop Action preferences]
+Name=Terminal Preferences
+Name[pt_BR]=Preferencias do terminal
+Name[pt]=Preferencias do terminal
+Exec=xfce4-terminal --preferences
+EOF
+update-desktop-database "${dest%/*}" 2>/dev/null || true
+echo "acoes do terminal: nova janela, nova aba, preferencias"
+'''

@@ -1,0 +1,474 @@
+<title>Ajustes - @@NOME@@</title>
+<meta name="projeto" content="@@NOME@@" data-versao="@@VERSAO@@">
+<link rel="stylesheet" href="estilo.css">
+<script src="comum.js"></script>
+
+<div class="estado"></div>
+
+<a class="voltar" href="/"><span aria-hidden="true">&larr;</span> Voltar ao início</a>
+<h1>Ajustes</h1>
+<p class="caminho">/ajustes</p>
+<p class="sub">Escolha as opções e aplique. Só as etapas afetadas pelo que mudou rodam de novo.<br>
+  As imagens são simulações desenhadas aqui, para escolher vendo: a área de trabalho de verdade
+  depende do tema instalado e da sua tela.</p>
+
+<div class="cartao destaque" id="cartaoInstalar" hidden style="margin-bottom:22px">
+  <h2>Primeira instalação</h2>
+  <p style="margin:0 0 12px;color:var(--fraco)">
+    Esta máquina ainda não foi preparada. A instalação roda todas as etapas, em ordem,
+    com as opções marcadas abaixo.
+  </p>
+  <details class="verif" id="verif">
+    <summary id="verifResumo">Verificando…</summary>
+    <div id="verificacoes"></div>
+  </details>
+  <div class="acoes">
+    <button class="bt pri" id="btInstalar">Instalar tudo</button>
+    <button class="bt sec" id="btRever">Verificar de novo</button>
+  </div>
+  <p style="color:var(--fraco);font-size:13px;margin:12px 0 0">
+    Se quiser, ajuste as opções antes de instalar. Dá para mudar tudo depois.
+  </p>
+</div>
+
+<!-- um cartao por grupo do recursos/opcoes.toml, desenhado pelo script abaixo -->
+<div class="grupos" id="grupos"><p class="sub">Carregando…</p></div>
+
+<div class="barra-acao">
+  <span class="conta" id="contaMudancas">Nada alterado</span>
+  <button class="bt pri" id="btAplicar">Aplicar</button>
+</div>
+
+<div class="cartao" style="margin-top:20px">
+  <h2>Etapas</h2>
+  <p style="margin:0;color:var(--fraco);font-size:13px">
+    Cada etapa é uma receita em <code>recursos/receitas</code>. As marcadas com ✓ já foram
+    aplicadas nesta máquina; passe o mouse para ver quando.
+  </p>
+  <div class="etapas" id="etapas"></div>
+</div>
+
+<!-- desfaz pelo desfazer.py; so aparece quando alguma etapa ja rodou -->
+<div class="cartao" style="margin-top:20px" id="cartaoDesfazer" hidden>
+  <h2>Voltar ao que era antes</h2>
+  <p style="margin:0;color:var(--fraco);font-size:13px">
+    Não gostou? Isto desfaz o que as etapas mudaram: arquivos criados saem, arquivos que já existiam
+    voltam da cópia de segurança e configurações voltam ao valor de antes. Os pacotes instalados ficam,
+    a não ser que você marque a opção abaixo.
+  </p>
+  <label class="opcao-apagar">
+    <input type="checkbox" id="apagarInstalado">
+    <span><b>Remover também o que foi instalado</b>
+      <span class="dica">Desinstala com o apt os pacotes que o projeto instalou e apaga as opções, o log,
+      as cópias de segurança e os downloads do projeto. O que já existia na máquina fica.</span></span>
+  </label>
+  <div class="aviso erro" id="listaApagar" hidden></div>
+  <div class="aviso erro" id="confirmaDesfazer" hidden role="alert">
+    <b id="confirmaTitulo">Voltar ao que era antes?</b>
+    <div class="acoes" style="margin-top:10px">
+      <button class="bt pri" id="btDesfazerSim">Sim, voltar</button>
+      <button class="bt sec" id="btDesfazerNao">Cancelar</button>
+    </div>
+  </div>
+  <div class="acoes">
+    <button class="bt sec" id="btDesfazer">Voltar ao que era antes</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const criar = (tag, classe, texto) => {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+};
+
+let estado = {}, salvo = {}, opcoes = [], receitas = [], instalado = true;
+let retomou = false;
+const BOTOES = ["#btAplicar", "#btInstalar", "#btRever", "#btDesfazer", "#btDesfazerSim"];
+const ROTULOS = {};
+
+// rotulos comuns; cada opcao pode trazer os seus no campo nomes do opcoes.toml
+const NOMES = {sim: "Com", nao: "Sem"};
+const rotulo = (v, o) => (o.nomes || {})[v] || NOMES[v] || (v ? v[0].toUpperCase() + v.slice(1) : "");
+
+// a expressao do opcoes.toml e do Python; as simples valem igual aqui, e o
+// servidor confere de novo de qualquer jeito
+function aceita(o, v){
+  if (!v) return false;
+  if (o.valores.includes(v)) return true;
+  if (!o.livre) return false;
+  try { return new RegExp("^(?:" + o.livre + ")$").test(v); }
+  catch (e) { return true; }
+}
+const invalidas = () => opcoes.filter(o => !aceita(o, estado[o.chave]));
+
+// ---- desenho ------------------------------------------------------------
+
+function desenharOpcoes(){
+  const caixa = $("#grupos");
+  caixa.textContent = "";
+  if (!opcoes.length){
+    caixa.appendChild(criar("p", "sub", "Nenhuma opção em recursos/opcoes.toml."));
+    return;
+  }
+  const cartoes = new Map();
+  opcoes.forEach(o => {
+    const grupo = o.grupo || "Ajustes";
+    if (!cartoes.has(grupo)){
+      const cartao = criar("div", "cartao");
+      cartao.appendChild(criar("h2", "", grupo));
+      cartoes.set(grupo, cartao);
+      caixa.appendChild(cartao);
+    }
+    cartoes.get(grupo).appendChild(linhaDaOpcao(o));
+  });
+}
+
+function linhaDaOpcao(o){
+  const linha = criar("div", "opcao");
+  const txt = criar("div");
+  const dica = criar("div", "dica", o.ajuda || "");
+  txt.append(criar("div", "rot", o.titulo), dica);
+  // como fica o valor marcado, numa imagem que vem no pacote
+  const exemplo = (o.exemplos || {})[estado[o.chave]];
+  if (exemplo){
+    const img = criar("img", "exemplo");
+    img.alt = `Exemplo: ${o.titulo}, ${rotulo(estado[o.chave], o)}`;
+    img.src = `/exemplos/${exemplo}`;
+    txt.appendChild(img);
+  }
+  linha.appendChild(txt);
+
+  if (o.livre){
+    // texto livre, com os valores da lista como sugestao
+    const lista = criar("datalist");
+    lista.id = "sugestoes-" + o.chave;
+    o.valores.forEach(v => { const op = criar("option"); op.value = v; lista.appendChild(op); });
+    const campo = criar("input", "texto");
+    campo.type = "text"; campo.spellcheck = false;
+    campo.value = estado[o.chave] || "";
+    campo.setAttribute("list", lista.id);
+    campo.setAttribute("aria-label", o.titulo);
+    const conferir = () => {
+      const ok = aceita(o, campo.value.trim());
+      campo.classList.toggle("invalido", !ok);
+      dica.classList.toggle("erro", !ok);
+      dica.textContent = ok ? (o.ajuda || "") : "Valor não aceito por esta opção.";
+    };
+    // redesenhar a cada tecla tiraria o foco do campo; so a contagem muda
+    campo.addEventListener("input", () => {
+      estado[o.chave] = campo.value.trim(); conferir(); desenharMudancas();
+    });
+    conferir();
+    linha.append(campo, lista);
+  } else if (o.valores.length <= 3){
+    const grupo = criar("div", "seg");
+    o.valores.forEach(v => {
+      const b = criar("button", "", rotulo(v, o));
+      b.setAttribute("aria-pressed", String(estado[o.chave] === v));
+      b.addEventListener("click", () => { estado[o.chave] = v; desenhar(); });
+      grupo.appendChild(b);
+    });
+    linha.appendChild(grupo);
+  } else {
+    const sel = criar("select");
+    sel.setAttribute("aria-label", o.titulo);
+    o.valores.forEach(v => {
+      const op = criar("option", "", rotulo(v, o));
+      op.value = v;
+      sel.appendChild(op);
+    });
+    sel.value = estado[o.chave];
+    sel.addEventListener("change", e => { estado[o.chave] = e.target.value; desenhar(); });
+    linha.appendChild(sel);
+  }
+  return linha;
+}
+
+// quantas opcoes a pagina tem diferentes do que foi aplicado por ultimo
+function desenharMudancas(){
+  const n = Object.keys(estado).filter(c => estado[c] !== salvo[c]).length;
+  const ruins = invalidas().length;
+  const conta = $("#contaMudancas");
+  conta.textContent = ruins ? (ruins === 1 ? "1 opção com valor não aceito" : `${ruins} opções com valor não aceito`)
+    : n === 0 ? "Nada alterado"
+    : n === 1 ? "1 opção alterada, ainda não aplicada" : `${n} opções alteradas, ainda não aplicadas`;
+  conta.classList.toggle("mudou", n > 0 || ruins > 0);
+}
+
+function desenhar(){
+  desenharOpcoes();
+  desenharMudancas();
+}
+
+function desenharEtapas(){
+  const caixa = $("#etapas");
+  caixa.textContent = "";
+  receitas.forEach(r => {
+    const e = criar("span", "etapa" + (r.aplicada ? " feito" : ""),
+                    (r.aplicada ? "✓ " : "") + (r.titulo || r.nome));
+    e.title = `etapa ${r.id}` + (r.quando ? `, aplicada em ${r.quando}` : ", pendente");
+    caixa.appendChild(e);
+  });
+}
+
+async function desenharVerificacoes(){
+  const caixa = $("#verificacoes"), resumo = $("#verifResumo");
+  resumo.textContent = "Verificando…";
+  let dados;
+  try { dados = await fetch("/api/verificacoes").then(r => r.json()); }
+  catch (e) { resumo.textContent = "Não consegui verificar."; return true; }
+  caixa.textContent = "";
+  const lista = dados.verificacoes || [];
+  lista.forEach(c => {
+    const linha = criar("div", "check " + (c.ok ? "sim" : (c.critico ? "nao" : "alerta")));
+    const txt = criar("div");
+    txt.append(criar("div", "", c.nome), criar("div", "det", c.detalhe));
+    linha.append(criar("span", "mk", c.ok ? "✓" : "!"), txt);
+    caixa.appendChild(linha);
+  });
+  // tudo certo cabe numa linha; so abre a lista quando algo impede
+  const impedem = dados.impedimentos || [];
+  const oks = lista.filter(c => c.ok).length;
+  resumo.textContent = "";
+  resumo.append(criar("span", impedem.length ? "nao" : "ok", impedem.length ? "! " : "✓ "),
+    document.createTextNode(impedem.length
+      ? `${impedem.length} ${impedem.length === 1 ? "verificação impede" : "verificações impedem"} a instalação`
+      : `${oks} de ${lista.length} verificações passaram`));
+  $("#verif").open = impedem.length > 0;
+  $("#btInstalar").disabled = impedem.length > 0 || Terminal.ocupado();
+  return impedem.length === 0;
+}
+
+// ---- textos do terminal ---------------------------------------------------
+
+// etapas que o terminal lista, a partir das receitas que a pagina conhece
+const etapasDe = ids => ids.map(id => {
+  const r = receitas.find(x => x.id === id);
+  return {id, nome: r ? (r.titulo || r.nome) : "Etapa " + id};
+});
+function etapasDoRotulo(rotulo){
+  if (/^Instalacao/.test(rotulo || "")) return etapasDe(receitas.map(r => r.id));
+  const m = (rotulo || "").match(/^(?:Re)?[Aa]plicando: (.*)$/);
+  return m ? etapasDe(m[1].split(", ")) : [];
+}
+// o rotulo do servidor e para o registro; na tela vai um nome curto
+function tituloDoRotulo(rotulo){
+  const r = rotulo || "";
+  if (/^Instalacao/.test(r)) return "Instalação completa";
+  if (/^Desfazendo/.test(r)) return "Voltando ao que era antes";
+  if (/^Reaplicando/.test(r)) return "Reaplicando os ajustes";
+  if (/^Aplicando/.test(r)) return "Aplicando os ajustes";
+  return r || "Tarefa em andamento";
+}
+
+// o que dizer ao terminar, igual para o clique e para a tarefa retomada
+function fimInstalar(codigo){
+  if (codigo === 0) return {bom: true, titulo: "Instalação concluída",
+    texto: "Todas as etapas rodaram. Daqui em diante é só ajustar e aplicar."};
+  if (codigo !== null) return {bom: false, titulo: "A instalação parou com erro",
+    texto: `Código ${codigo}. A etapa em vermelho mostra onde parou; dá para corrigir e instalar de novo, `
+         + "e o que já foi feito é pulado."};
+  return null;
+}
+function fimAplicar(reaplicou, codigo){
+  if (codigo === 0) return {bom: true, titulo: "Ajustes aplicados",
+    texto: reaplicou
+      ? "Reapliquei as mesmas opções. Pode mudar algo e aplicar quantas vezes quiser."
+      : "Pronto. Pode mudar outra coisa e aplicar de novo, sem fechar a página."};
+  if (codigo !== null) return {bom: false, titulo: "A aplicação parou com erro",
+    texto: `Código ${codigo}. A etapa em vermelho e as linhas vermelhas do log mostram onde parou.`};
+  return null;
+}
+
+// ---- carga ----------------------------------------------------------------
+
+async function carregar(){
+  let d;
+  try { d = await fetch("/api/estado").then(r => r.json()); }
+  catch (e) {
+    $("#grupos").textContent = "";
+    $("#grupos").appendChild(criar("p", "sub", "Não consegui falar com o servidor local."));
+    return;
+  }
+  estado = d.config || {};
+  salvo = {...estado};
+  opcoes = d.opcoes || [];
+  receitas = d.receitas || [];
+  instalado = d.instalado !== false;
+  desenhar();
+  desenharEtapas();
+
+  $("#cartaoInstalar").hidden = instalado;
+  $("#cartaoDesfazer").hidden = !receitas.some(r => r.aplicada);
+  ROTULOS["#btAplicar"] = instalado ? "Aplicar" : "Aplicar (instale primeiro)";
+  travar(Terminal.ocupado());
+  if (!instalado) await desenharVerificacoes();
+
+  // uma tarefa que ja rodava antes de a pagina abrir (ou de recarregar) volta a aparecer
+  if (!retomou){
+    retomou = true;
+    let rotuloRetomado = "";
+    Terminal.retomar({
+      titulo: rotulo => { rotuloRetomado = rotulo || ""; return tituloDoRotulo(rotulo); },
+      etapas: etapasDoRotulo,
+      aoTerminar: async codigo => {
+        await carregar();
+        if (/^Instalacao/.test(rotuloRetomado)) return fimInstalar(codigo);
+        if (/aplicando/i.test(rotuloRetomado)) return fimAplicar(/^Re/.test(rotuloRetomado), codigo);
+        if (/^Desfazendo/.test(rotuloRetomado)) return fimDesfazer(codigo);
+        return null;
+      },
+    });
+  }
+}
+carregar();
+
+// ---- execucao -----------------------------------------------------------
+
+function travar(ocupado, qual, rotuloOcupado){
+  BOTOES.forEach(sel => {
+    const b = $(sel); if (!b) return;
+    if (ROTULOS[sel] === undefined) ROTULOS[sel] = b.textContent;
+    b.disabled = ocupado || (sel === "#btAplicar" && !instalado);
+    b.textContent = (ocupado && sel === qual) ? rotuloOcupado : ROTULOS[sel];
+  });
+}
+// os botoes acompanham a tarefa: voltam quando ela termina e travam quando a
+// pagina retoma uma que ja rodava. Num clique eles ja estao travados, com o
+// rotulo "Aplicando…", que nao deve ser trocado
+Terminal.aoMudar(ocupado => {
+  if (!ocupado || !BOTOES.some(sel => $(sel) && $(sel).disabled)) travar(ocupado);
+});
+
+async function pedir(rota, corpo){
+  try {
+    return await fetch(rota, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(corpo || {})
+    }).then(x => x.json());
+  } catch (e) { return {iniciado: false, erro: "O servidor local não respondeu."}; }
+}
+
+function naoComecou(texto){
+  travar(false);
+  Terminal.avisar(false, "Não deu para começar", texto);
+}
+
+$("#btAplicar").addEventListener("click", async () => {
+  const ruins = invalidas();
+  if (ruins.length){
+    Terminal.avisar(false, "Confira as opções", "Estes valores não são aceitos:",
+                    ruins.map(o => `${o.titulo}: “${estado[o.chave] || ""}”`));
+    return;
+  }
+  travar(true, "#btAplicar", "Aplicando…");
+  const r = await pedir("/api/aplicar", estado);
+  if (!r.iniciado){
+    if (r.motivo === "nada a fazer"){
+      travar(false);
+      await carregar();
+      Terminal.avisar(true, "Opções gravadas",
+        "Nenhuma etapa depende do que mudou, então nada precisou rodar.");
+      return;
+    }
+    naoComecou(r.erro || (r.motivo === "ocupado"
+      ? "Já tem uma tarefa rodando. Espere terminar."
+      : "Não havia nada a fazer com essas opções."));
+    return;
+  }
+  Terminal.acompanhar({
+    titulo: r.reaplicou ? "Reaplicando os ajustes" : "Aplicando os ajustes",
+    etapas: etapasDe(r.receitas || []),
+    aoTerminar: async codigo => { await carregar(); return fimAplicar(r.reaplicou, codigo); },
+  });
+});
+
+$("#btInstalar").addEventListener("click", async () => {
+  if (!await desenharVerificacoes()) return;
+  travar(true, "#btInstalar", "Instalando…");
+  const r = await pedir("/api/instalar", estado);
+  if (!r.iniciado){
+    naoComecou((r.impedimentos || []).length
+      ? "As verificações impedem: " + r.impedimentos.join(", ") + "."
+      : (r.erro || "Não consegui iniciar a instalação."));
+    return;
+  }
+  Terminal.acompanhar({
+    titulo: "Instalação completa",
+    etapas: etapasDe(receitas.map(x => x.id)),
+    aoTerminar: async codigo => { await carregar(); return fimInstalar(codigo); },
+  });
+});
+
+// ---- voltar ao que era antes ----------------------------------------------
+
+function fimDesfazer(codigo){
+  if (codigo === 0) return {bom: true, titulo: "Máquina como era antes",
+    texto: "Algumas mudanças só aparecem depois de sair e entrar na sessão."};
+  if (codigo !== null) return {bom: false, titulo: "Voltou só em parte",
+    texto: `${codigo} problema(s). As linhas vermelhas do log mostram o que não deu.`};
+  return null;
+}
+
+// com a caixa marcada, a lista exata do que sai, antes de confirmar
+async function desenharPreviaApagar(){
+  const caixa = $("#listaApagar");
+  const apagar = $("#apagarInstalado").checked;
+  $("#confirmaTitulo").textContent = apagar
+    ? "Voltar ao que era antes e apagar o que foi instalado?" : "Voltar ao que era antes?";
+  $("#btDesfazerSim").textContent = apagar ? "Sim, voltar e apagar" : "Sim, voltar";
+  ROTULOS["#btDesfazerSim"] = $("#btDesfazerSim").textContent;
+  if (!apagar){ caixa.hidden = true; return; }
+  caixa.hidden = false;
+  caixa.textContent = "Conferindo o que o projeto instalou…";
+  let p;
+  try { p = await fetch("/api/desfazer/previa").then(r => r.json()); }
+  catch (e) { caixa.textContent = "Não consegui conferir o que seria apagado."; return; }
+  caixa.textContent = "";
+  const lista = (titulo, itens) => {
+    if (!itens.length) return;
+    caixa.appendChild(criar("b", "", titulo));
+    const ul = criar("ul");
+    itens.forEach(i => ul.appendChild(criar("li", "", i)));
+    caixa.appendChild(ul);
+  };
+  const sai = [];
+  if (p.pacotes.length) sai.push("Pacotes desinstalados com apt: " + p.pacotes.join(", "));
+  p.pastas_do_projeto.forEach(a => sai.push("Apagado: " + a + " (opções, log, cópias e downloads)"));
+  if (sai.length) lista("Será apagado", sai);
+  else caixa.appendChild(criar("b", "", "Nada instalado pelo projeto foi encontrado"));
+  lista("Fica instalado", p.ficam.map(f => `${f.nome}: ${f.motivo}`));
+  if (p.origem === "historico")
+    caixa.appendChild(criar("p", "dica", "Esta instalação é anterior ao diário de alterações; "
+      + "a lista de pacotes veio do histórico do apt."));
+}
+$("#apagarInstalado").addEventListener("change", desenharPreviaApagar);
+
+$("#btDesfazer").addEventListener("click", () => {
+  $("#confirmaDesfazer").hidden = false;
+  $("#btDesfazerSim").focus();
+});
+$("#btDesfazerNao").addEventListener("click", () => { $("#confirmaDesfazer").hidden = true; });
+$("#btDesfazerSim").addEventListener("click", async () => {
+  $("#confirmaDesfazer").hidden = true;
+  travar(true, "#btDesfazer", "Voltando…");
+  const r = await pedir("/api/desfazer", {apagar: $("#apagarInstalado").checked});
+  if (!r.iniciado){
+    naoComecou(r.erro || (r.motivo === "ocupado"
+      ? "Já tem uma tarefa rodando. Espere terminar." : "Não consegui começar."));
+    return;
+  }
+  Terminal.acompanhar({
+    titulo: "Voltando ao que era antes",
+    etapas: r.etapas || [],
+    aoTerminar: async codigo => { await carregar(); return fimDesfazer(codigo); },
+  });
+});
+
+$("#btRever").addEventListener("click", async e => {
+  e.target.disabled = true; await desenharVerificacoes(); e.target.disabled = false;
+});
+</script>

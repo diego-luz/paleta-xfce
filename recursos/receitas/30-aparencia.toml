@@ -1,0 +1,129 @@
+[modulo]
+id = "30"
+nome = "aparencia"
+titulo = "Tema, icones e fontes"
+requer = ["20"]
+afetada_por = ["paleta", "modo", "compacto", "icones", "fonte"]
+
+[[passo]]
+tipo = "xfconf"
+dizer = "aplicando o tema @@gtk_tema@@"
+canal = "xsettings"
+chave = "/Net/ThemeName"
+valor = "@@gtk_tema@@"
+
+[[passo]]
+tipo = "xfconf"
+canal = "xsettings"
+chave = "/Net/IconThemeName"
+valor = "@@icones_tema@@"
+
+[[passo]]
+tipo = "xfconf"
+se = "fonte != sistema"
+canal = "xsettings"
+chave = "/Gtk/FontName"
+valor = "@@fonte_ui@@ 10"
+
+[[passo]]
+tipo = "xfconf"
+canal = "xsettings"
+chave = "/Xft/HintStyle"
+valor = "hintslight"
+
+[[passo]]
+tipo = "xfconf"
+canal = "xsettings"
+chave = "/Xft/RGBA"
+valor = "rgb"
+
+# o Nordic e os temas do Fausto trazem xfwm4 com o mesmo nome do tema GTK
+[[passo]]
+tipo = "xfconf"
+dizer = "barra de titulo na mesma paleta"
+canal = "xfwm4"
+chave = "/general/theme"
+valor = "@@gtk_tema@@"
+
+# com o encaixe ligado o 35 troca o tema acima pela copia de bordas largas;
+# se so esta receita rodar de novo, a copia e refeita aqui
+[[passo]]
+tipo = "script"
+se = "janelas == sim"
+tolera_falha = true
+corpo = '''
+b="$HOME/.local/bin/d3bian-bordas"
+[ -x "$b" ] || exit 0
+d3_antes "$HOME/.themes/$CTX_GTK_TEMA-bordas"
+novo=$("$b" "$CTX_GTK_TEMA" 4)
+d3_xfconf xfwm4 /general/theme string
+xfconf-query -c xfwm4 -p /general/theme -s "$novo"
+'''
+
+[[passo]]
+tipo = "xfconf"
+canal = "xfwm4"
+chave = "/general/button_layout"
+valor = "|HMC"
+
+[[passo]]
+tipo = "xfconf"
+canal = "xfwm4"
+chave = "/general/title_alignment"
+valor = "center"
+
+[[passo]]
+tipo = "xfconf"
+se = "fonte != sistema"
+canal = "xfwm4"
+chave = "/general/title_font"
+valor = "@@fonte_titulo@@"
+
+# o motor nao anota passo comando; o valor de antes fica guardado aqui
+[[passo]]
+tipo = "script"
+tolera_falha = true
+corpo = '''
+for chave in color-scheme gtk-theme icon-theme; do d3_gsettings org.gnome.desktop.interface "$chave"; done
+'''
+
+[[passo]]
+tipo = "comando"
+dizer = "avisando os apps GTK4 que o modo e @@modo@@"
+tolera_falha = true
+argumentos = ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "@@gtk_esquema@@"]
+
+[[passo]]
+tipo = "comando"
+tolera_falha = true
+argumentos = ["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "@@gtk_tema@@"]
+
+[[passo]]
+tipo = "comando"
+tolera_falha = true
+argumentos = ["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", "@@icones_tema@@"]
+
+[[passo]]
+tipo = "arquivo"
+dizer = "arquivos de tema para quem nao le o xsettings"
+destino = "~/.config/gtk-3.0/settings.ini"
+conteudo = '''
+[Settings]
+gtk-theme-name=@@gtk_tema@@
+gtk-icon-theme-name=@@icones_tema@@
+gtk-font-name=@@fonte_ui@@ 10
+gtk-application-prefer-dark-theme=@@gtk_escuro@@
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle=hintslight
+gtk-xft-rgba=rgb
+'''
+
+[[passo]]
+tipo = "arquivo"
+destino = "~/.gtkrc-2.0"
+conteudo = '''
+gtk-theme-name="@@gtk_tema@@"
+gtk-icon-theme-name="@@icones_tema@@"
+gtk-font-name="@@fonte_ui@@ 10"
+'''

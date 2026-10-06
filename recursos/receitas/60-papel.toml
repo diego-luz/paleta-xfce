@@ -1,0 +1,87 @@
+[modulo]
+id = "60"
+nome = "papel"
+titulo = "Papel de parede e area de trabalho"
+afetada_por = ["papel", "paleta", "modo", "icones_area"]
+
+# o papel e desenhado aqui, com duas cores proximas; nada e baixado
+[[passo]]
+tipo = "script"
+se = "papel != manter"
+dizer = "desenhando o papel de parede"
+corpo = '''
+convert=$(command -v convert || command -v magick || true)
+[ -n "$convert" ] || { echo "atencao: sem ImageMagick; o papel de parede fica como esta"; exit 0; }
+mkdir -p "$CTX_PAPEIS_DIR"
+d3_antes "$CTX_PAPEL_ARQUIVO"
+if [ "$CTX_PAPEL" = liso ]; then
+  "$convert" -size 3840x2160 "xc:$CTX_PAPEL_COR_CIMA" "$CTX_PAPEL_ARQUIVO"
+else
+  "$convert" -size 3840x2160 \
+    "gradient:$CTX_PAPEL_COR_CIMA-$CTX_PAPEL_COR_BAIXO" "$CTX_PAPEL_ARQUIVO"
+fi
+echo "papel de parede em $CTX_PAPEL_ARQUIVO"
+'''
+
+[[passo]]
+tipo = "script"
+se = "papel != manter"
+dizer = "aplicando o papel em todos os monitores"
+tolera_falha = true
+corpo = '''
+for p in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E 'last-image$'); do
+  d3_xfconf xfce4-desktop "$p" string
+  xfconf-query -c xfce4-desktop -p "$p" -s "$CTX_PAPEL_ARQUIVO"
+done
+# a chave do monitor ligado agora pode ainda nao existir
+for mon in $(xrandr --query 2>/dev/null | awk '/ connected/{print $1}'); do
+  chave="/backdrop/screen0/monitor$mon/workspace0/last-image"
+  d3_xfconf xfce4-desktop "$chave" string
+  d3_xfconf xfce4-desktop "/backdrop/screen0/monitor$mon/workspace0/image-style" int
+  xfconf-query -c xfce4-desktop -p "$chave" -n -t string -s "$CTX_PAPEL_ARQUIVO" 2>/dev/null \
+    || xfconf-query -c xfce4-desktop -p "$chave" -s "$CTX_PAPEL_ARQUIVO" 2>/dev/null || true
+  xfconf-query -c xfce4-desktop -p "/backdrop/screen0/monitor$mon/workspace0/image-style" \
+    -n -t int -s 5 2>/dev/null || true
+done
+xfdesktop --reload >/dev/null 2>&1 || true
+'''
+
+[[passo]]
+tipo = "xfconf"
+dizer = "icones da area de trabalho: @@icones_area@@"
+canal = "xfce4-desktop"
+chave = "/desktop-icons/style"
+tipo_valor = "int"
+valor = "@@icones_area_valor@@"
+
+[[passo]]
+tipo = "xfconf"
+se = "icones_area != nenhum"
+canal = "xfce4-desktop"
+chave = "/desktop-icons/file-icons/show-removable"
+tipo_valor = "bool"
+valor = "@@mostrar_removiveis@@"
+
+[[passo]]
+tipo = "xfconf"
+se = "icones_area != nenhum"
+canal = "xfce4-desktop"
+chave = "/desktop-icons/file-icons/show-filesystem"
+tipo_valor = "bool"
+valor = "@@mostrar_arquivos@@"
+
+[[passo]]
+tipo = "xfconf"
+se = "icones_area != nenhum"
+canal = "xfce4-desktop"
+chave = "/desktop-icons/file-icons/show-home"
+tipo_valor = "bool"
+valor = "@@mostrar_arquivos@@"
+
+[[passo]]
+tipo = "xfconf"
+se = "icones_area != nenhum"
+canal = "xfce4-desktop"
+chave = "/desktop-icons/file-icons/show-trash"
+tipo_valor = "bool"
+valor = "@@mostrar_arquivos@@"

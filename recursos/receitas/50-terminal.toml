@@ -1,0 +1,30 @@
+[modulo]
+id = "50"
+nome = "terminal"
+titulo = "Cores do terminal na paleta"
+afetada_por = ["paleta", "modo", "terminal"]
+
+[[passo]]
+tipo = "script"
+se = "terminal == sim"
+dizer = "aplicando a paleta @@paleta_nome@@ no terminal"
+corpo = '''
+command -v xfce4-terminal >/dev/null || { echo "xfce4-terminal nao instalado; nada a fazer"; exit 0; }
+x() {
+  d3_xfconf xfce4-terminal "$1" "$2"
+  xfconf-query -c xfce4-terminal -p "$1" -t "$2" -s "$3" --create 2>/dev/null || {
+    xfconf-query -c xfce4-terminal -p "$1" -r 2>/dev/null || true
+    xfconf-query -c xfce4-terminal -p "$1" -t "$2" -s "$3" --create
+  }
+}
+# fundo solido: transparencia mistura o papel de parede com o texto
+x /background-mode string TERMINAL_BACKGROUND_SOLID
+x /color-use-theme bool false
+x /color-foreground string "$CTX_COR_TEXTO"
+x /color-background string "$CTX_COR_FUNDO"
+x /color-cursor string "$CTX_COR_TEXTO"
+x /color-bold-use-default bool true
+x /color-palette string "$CTX_PALETA_XFCE"
+echo "terminal na paleta $CTX_PALETA_NOME"
+echo "atencao: janelas do terminal ja abertas so mudam depois de fechar todas"
+'''

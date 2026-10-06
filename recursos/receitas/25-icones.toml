@@ -1,0 +1,57 @@
+[modulo]
+id = "25"
+nome = "icones"
+titulo = "Icones na cor da paleta"
+requer = ["10"]
+afetada_por = ["icones", "paleta", "modo"]
+
+# o Papirus vem do apt (etapa 10) e o Adwaita ja esta no sistema; so o Tela
+# precisa ser baixado e instalado
+[[passo]]
+tipo = "git"
+se = "icones == tela"
+url = "https://github.com/vinceliuice/Tela-icon-theme.git"
+ref = "master"
+destino = "@@fontes@@/Tela-icon-theme"
+
+[[passo]]
+tipo = "script"
+se = "icones == tela"
+dizer = "instalando os icones Tela na cor @@tela_cor@@"
+corpo = '''
+cd "$CTX_FONTES/Tela-icon-theme"
+d3_pasta "$HOME/.local/share/icons"
+for t in "$HOME/.local/share/icons/Tela-$CTX_TELA_COR" \
+         "$HOME/.local/share/icons/Tela-$CTX_TELA_COR-dark" \
+         "$HOME/.local/share/icons/Tela-$CTX_TELA_COR-light"; do
+  d3_antes "$t"
+done
+bash ./install.sh -c "$CTX_TELA_COR" </dev/null
+[ -d "$HOME/.local/share/icons/$CTX_ICONES_TEMA" ] || {
+  echo "atencao: esperava os icones $CTX_ICONES_TEMA e eles nao foram gerados"; exit 1; }
+echo "icones $CTX_ICONES_TEMA instalados"
+'''
+
+[[passo]]
+tipo = "git"
+se = "icones == qogir"
+url = "https://github.com/vinceliuice/Qogir-icon-theme.git"
+ref = "master"
+destino = "@@fontes@@/Qogir-icon-theme"
+
+[[passo]]
+tipo = "script"
+se = "icones == qogir"
+dizer = "instalando os icones Qogir"
+corpo = '''
+cd "$CTX_FONTES/Qogir-icon-theme"
+d3_pasta "$HOME/.local/share/icons"
+for t in "$HOME/.local/share/icons/Qogir" "$HOME/.local/share/icons/Qogir-dark" \
+         "$HOME/.local/share/icons/Qogir-light"; do
+  d3_antes "$t"
+done
+bash ./install.sh -t default </dev/null
+[ -d "$HOME/.local/share/icons/$CTX_ICONES_TEMA" ] || {
+  echo "atencao: esperava os icones $CTX_ICONES_TEMA e eles nao foram gerados"; exit 1; }
+echo "icones $CTX_ICONES_TEMA instalados"
+'''

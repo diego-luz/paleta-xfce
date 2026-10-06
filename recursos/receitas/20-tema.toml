@@ -1,0 +1,57 @@
+[modulo]
+id = "20"
+nome = "tema"
+titulo = "Tema das janelas na paleta escolhida"
+requer = ["10"]
+afetada_por = ["paleta", "modo", "compacto"]
+
+# Nord: o autor publica o tema pronto, entao baixar e extrair basta
+[[passo]]
+tipo = "script"
+se = "tema_metodo == release"
+dizer = "baixando o tema @@gtk_tema@@"
+corpo = '''
+destino="$HOME/.themes/$CTX_GTK_TEMA"
+if [ -d "$destino" ]; then
+  echo "$CTX_GTK_TEMA ja esta em ~/.themes"
+  exit 0
+fi
+d3_pasta "$HOME/.themes"
+d3_antes "$destino"
+mkdir -p "$HOME/.themes"
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+curl -fsSL -o "$tmp" "$CTX_TEMA_URL"
+tar -xJf "$tmp" -C "$HOME/.themes"
+[ -d "$destino" ] || { echo "o pacote nao trouxe a pasta $CTX_GTK_TEMA" >&2; exit 1; }
+echo "tema $CTX_GTK_TEMA instalado"
+'''
+
+# Gruvbox e Everforest: repositorio do mesmo autor, compilado com sassc
+[[passo]]
+tipo = "git"
+se = "tema_metodo == instalador"
+url = "@@tema_repo@@"
+ref = "master"
+destino = "@@fontes@@/@@tema_pasta@@"
+
+[[passo]]
+tipo = "script"
+se = "tema_metodo == instalador"
+dizer = "compilando o tema @@gtk_tema@@, a parte mais demorada"
+corpo = '''
+cd "$CTX_FONTES/$CTX_TEMA_PASTA/themes"
+d3_pasta "$HOME/.themes"
+d3_antes "$HOME/.themes/$CTX_GTK_TEMA"
+# o instalador cria tambem as versoes -hdpi e -xhdpi; o que aparecer de novo em
+# ~/.themes entra no diario para o desfazer apagar
+antes=$(ls -1 "$HOME/.themes" 2>/dev/null || true)
+bash ./install.sh -c "$CTX_TEMA_COR_INSTALL" -s "$CTX_TEMA_TAMANHO_INSTALL" </dev/null
+for novo in $(ls -1 "$HOME/.themes"); do
+  [ "$novo" = "$CTX_GTK_TEMA" ] && continue
+  printf '%s\n' "$antes" | grep -qxF "$novo" || d3_criado "$HOME/.themes/$novo"
+done
+[ -d "$HOME/.themes/$CTX_GTK_TEMA" ] || {
+  echo "esperava o tema $CTX_GTK_TEMA em ~/.themes e ele nao foi gerado" >&2; exit 1; }
+echo "tema $CTX_GTK_TEMA pronto"
+'''

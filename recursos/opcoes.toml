@@ -1,0 +1,134 @@
+# Preferencias que a pagina de Ajustes desenha e que as receitas usam.
+#
+# A ideia do projeto: uma paleta so em tudo. A escolha da paleta decide o tema
+# das janelas, os icones, as cores do terminal e o papel de parede; o resto das
+# opcoes e so o quanto de enfeite fica na tela.
+
+[[opcao]]
+chave = "paleta"
+padrao = "nord"
+valores = ["nord", "gruvbox", "everforest"]
+titulo = "Paleta"
+ajuda = "Vale para janelas, icones, terminal e papel de parede"
+grupo = "Paleta"
+nomes = { nord = "Nord", gruvbox = "Gruvbox", everforest = "Everforest" }
+exemplos = { "nord" = "paleta-nord.png", "gruvbox" = "paleta-gruvbox.png", "everforest" = "paleta-everforest.png" }
+
+
+[[opcao]]
+chave = "modo"
+padrao = "escuro"
+valores = ["escuro", "claro"]
+titulo = "Claro ou escuro"
+ajuda = "Cada paleta tem as duas versoes"
+grupo = "Paleta"
+nomes = { escuro = "Escuro", claro = "Claro" }
+exemplos = { "escuro" = "modo-escuro.png", "claro" = "modo-claro.png" }
+
+
+[[opcao]]
+chave = "compacto"
+padrao = "sim"
+valores = ["sim", "nao"]
+titulo = "Barras de titulo estreitas"
+ajuda = "A variante compacta do tema, com menos altura"
+grupo = "Paleta"
+exemplos = { "sim" = "compacto-sim.png", "nao" = "compacto-nao.png" }
+
+
+[[opcao]]
+chave = "icones"
+padrao = "papirus"
+valores = ["papirus", "tela", "qogir", "adwaita"]
+titulo = "Icones"
+ajuda = "Papirus vem do repositorio; Tela e Qogir sao baixados, o Tela sai na cor da paleta"
+grupo = "Paleta"
+nomes = { papirus = "Papirus", tela = "Tela, na cor da paleta", qogir = "Qogir", adwaita = "Adwaita (padrao)" }
+
+[[opcao]]
+chave = "terminal"
+padrao = "sim"
+valores = ["sim", "nao"]
+titulo = "Cores no terminal"
+ajuda = "Aplica a paleta no xfce4-terminal, com fundo solido"
+grupo = "Paleta"
+
+[[opcao]]
+chave = "fonte"
+padrao = "inter"
+valores = ["inter", "cantarell", "sistema"]
+titulo = "Fonte da interface"
+ajuda = "Inter e Cantarell vem do repositorio; Sistema mantem a atual"
+grupo = "Paleta"
+nomes = { inter = "Inter", cantarell = "Cantarell", sistema = "Manter a atual" }
+
+[[opcao]]
+chave = "barra"
+padrao = "topo"
+valores = ["topo", "baixo"]
+titulo = "Onde fica a barra"
+ajuda = "Uma barra so, colada na borda, ocupando a largura da tela"
+grupo = "Barra"
+nomes = { topo = "No topo", baixo = "Embaixo" }
+exemplos = { "topo" = "barra-topo.png", "baixo" = "barra-baixo.png" }
+
+
+[[opcao]]
+chave = "barra_tarefas"
+padrao = "docklike"
+valores = ["docklike", "botoes", "nenhuma"]
+titulo = "Janelas abertas na barra"
+ajuda = "Docklike agrupa por programa e aceita fixar; Botoes e o padrao do Xfce"
+grupo = "Barra"
+nomes = { docklike = "Docklike, so icones", botoes = "Botoes de janela", nenhuma = "Nenhuma" }
+exemplos = { "docklike" = "barra_tarefas-docklike.png", "botoes" = "barra_tarefas-botoes.png", "nenhuma" = "barra_tarefas-nenhuma.png" }
+
+
+[[opcao]]
+chave = "relogio"
+padrao = "curto"
+valores = ["curto", "completo", "so_hora"]
+titulo = "Relogio"
+ajuda = "Curto: seg 15 set 14:20. Completo inclui o ano"
+grupo = "Barra"
+nomes = { curto = "Dia, mes e hora", completo = "Data completa", so_hora = "So a hora" }
+
+[[opcao]]
+chave = "menu"
+padrao = "icone"
+valores = ["icone", "icone_texto", "nenhum"]
+titulo = "Menu de programas"
+ajuda = "O menu Whisker no canto esquerdo da barra"
+grupo = "Barra"
+nomes = { icone = "So o icone", icone_texto = "Icone e nome", nenhum = "Sem menu" }
+exemplos = { "icone" = "menu-icone.png", "nenhum" = "menu-nenhum.png" }
+
+
+[[opcao]]
+chave = "papel"
+padrao = "degrade"
+valores = ["degrade", "liso", "manter"]
+titulo = "Papel de parede"
+ajuda = "Desenhado aqui com as cores da paleta; Manter nao mexe no seu"
+grupo = "Area de trabalho"
+nomes = { degrade = "Degrade suave", liso = "Cor lisa", manter = "Manter o atual" }
+exemplos = { "degrade" = "papel-degrade.png", "liso" = "papel-liso.png" }
+
+
+[[opcao]]
+chave = "icones_area"
+padrao = "nenhum"
+valores = ["nenhum", "so_removiveis", "tudo"]
+titulo = "Icones na area de trabalho"
+ajuda = "Sem icone nenhum e o mais limpo"
+grupo = "Area de trabalho"
+nomes = { nenhum = "Nenhum", so_removiveis = "So pendrives e discos", tudo = "Tudo, como vem" }
+
+
+[[opcao]]
+chave = "janelas"
+padrao = "sim"
+valores = ["sim", "nao"]
+titulo = "Encaixe e bordas de janela"
+ajuda = "Bordas mais largas para redimensionar, atalhos e layouts no Super+Z"
+grupo = "Janelas"

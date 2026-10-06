@@ -1,0 +1,77 @@
+[modulo]
+id = "10"
+nome = "pacotes"
+titulo = "Ferramentas, icones e fontes do repositorio"
+nucleo = true
+afetada_por = ["icones", "fonte", "barra_tarefas", "paleta"]
+
+[[passo]]
+tipo = "comando"
+dizer = "atualizando o indice do apt"
+root = true
+tolera_falha = true
+argumentos = ["apt-get", "update"]
+
+# guarda e devolve a barra inteira, com os arquivos dos plugins; a receita da
+# barra guarda a de antes com ele, e o desfazer carrega de volta
+[[passo]]
+tipo = "apt"
+dizer = "o que guarda e devolve a barra"
+pacotes = ["xfce4-panel-profiles"]
+
+# sassc e companhia so servem para compilar o Gruvbox e o Everforest
+[[passo]]
+tipo = "apt"
+se = "paleta != nord"
+dizer = "ferramentas para compilar o tema"
+pacotes = ["git", "sassc", "libglib2.0-dev-bin", "libxml2-utils"]
+
+[[passo]]
+tipo = "apt"
+se = "paleta == nord"
+dizer = "ferramentas para baixar o tema pronto"
+pacotes = ["curl", "xz-utils"]
+
+[[passo]]
+tipo = "apt"
+se = "icones == papirus"
+dizer = "icones Papirus"
+pacotes = ["papirus-icon-theme"]
+
+[[passo]]
+tipo = "apt"
+se = "icones == tela"
+dizer = "o Tela e baixado; git para isso"
+pacotes = ["git"]
+
+[[passo]]
+tipo = "apt"
+se = "icones == qogir"
+dizer = "o Qogir e baixado; git para isso"
+pacotes = ["git"]
+
+[[passo]]
+tipo = "apt"
+se = "fonte == inter"
+pacotes = ["fonts-inter"]
+
+[[passo]]
+tipo = "apt"
+se = "fonte == cantarell"
+pacotes = ["fonts-cantarell"]
+
+[[passo]]
+tipo = "apt"
+se = "barra_tarefas == docklike"
+dizer = "barra de tarefas docklike"
+pacotes = ["xfce4-docklike-plugin"]
+
+[[passo]]
+tipo = "apt"
+se = "menu != nenhum"
+pacotes = ["xfce4-whiskermenu-plugin"]
+
+[[passo]]
+tipo = "apt"
+dizer = "o que desenha o papel de parede"
+pacotes = ["imagemagick"]
