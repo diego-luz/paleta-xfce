@@ -46,6 +46,14 @@ def anotar(tipo: str, **dados) -> None:
         estado.registrar(f"nao consegui anotar no diario: {erro}")
 
 
+def caminho_valido(bruto) -> bool:
+    """Absoluto e ja normalizado (sem "..", "." nem barras repetidas). O diario
+    fica numa pasta da pessoa: um caminho como ~/.x/../../../etc/algo passaria
+    por "dentro da casa" e o desfazer apagaria ou devolveria outra coisa."""
+    return (isinstance(bruto, str) and bruto.startswith("/") and not bruto.startswith("//")
+            and "\0" not in bruto and os.path.normpath(bruto) == bruto)
+
+
 def ler() -> list[dict]:
     try:
         linhas = arquivo().read_text(encoding="utf-8").splitlines()
@@ -54,9 +62,19 @@ def ler() -> list[dict]:
     itens = []
     for linha in linhas:
         try:
-            itens.append(json.loads(linha))
+            item = json.loads(linha)
         except json.JSONDecodeError:
             continue
+        if not isinstance(item, dict):
+            continue
+        # linha com caminho torto e descartada inteira, aqui na leitura
+        criados = item.get("criados", [])
+        caminhos_da_linha = ([item["caminho"]] if "caminho" in item else []) \
+            + (criados if isinstance(criados, list) else [None])
+        if not all(caminho_valido(c) for c in caminhos_da_linha):
+            estado.registrar(f"diario: linha ignorada, caminho invalido: {linha[:200]}")
+            continue
+        itens.append(item)
     return itens
 
 

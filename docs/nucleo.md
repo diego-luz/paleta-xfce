@@ -164,8 +164,8 @@ vêm do histórico do apt.
 | `bloco` | `destino`, `conteudo`, `marca`, `comentario = "#"` | põe ou troca um trecho marcado num arquivo existente |
 | `comando` | `argumentos`, `root`, `tolera_falha` | roda um programa |
 | `script` | `corpo`, `tolera_falha` | trecho de bash, com o contexto também em `$CTX_*` |
-| `git` | `url`, `destino`, `ref` | clona ou atualiza |
-| `copiar` | `origem`, `destino`, `root`, `tolera_falha` | copia arquivo ou pasta |
+| `git` | `url`, `destino`, `ref` | clona ou atualiza no commit `ref` (40 hexadecimais, obrigatório), conferido e com a árvore limpa |
+| `copiar` | `origem`, `destino`, `root`, `tolera_falha` | copia arquivo ou pasta; com `root`, passa por uma pasta temporária do root e fica `root:root` |
 | `autostart` | `id`, `nome`, `comando`, `remover` | entrada em `~/.config/autostart` |
 | `processo` | `nome`, `acao` (parar, iniciar, reiniciar), `argumentos` | programa da sessão gráfica |
 | `backup` | `caminhos` | guarda cópia antes de mexer |

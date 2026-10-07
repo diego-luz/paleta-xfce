@@ -31,7 +31,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from . import caminhos, config, diario, estado, motor, projeto, receitas, sistema
+from . import caminhos, config, diario, estado, motor, programas, projeto, receitas, sistema
 
 Diz = Callable[[str], None]
 
@@ -50,6 +50,16 @@ PROTEGIDOS = {Path("/"), Path.home(), Path("/usr"), Path("/etc"), Path("/opt"), 
 
 def etapas(apagar: bool = False) -> list[tuple[str, str]]:
     return ETAPAS + ([ETAPA_APAGAR] if apagar else [])
+
+
+def _saida_root(argumentos: list[str]) -> str:
+    """Saida de um comando de root que so le (realpath), ou "" se falhar."""
+    try:
+        proc = subprocess.run(["sudo", "-n", *argumentos], capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
+    except OSError:
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
 def _rodar(argumentos: list[str], diz: Diz) -> int:
@@ -74,14 +84,31 @@ def _da_pessoa(caminho: Path) -> bool:
 # que ele lista fora daqui aparece para conferir a mao. Cada projeto acrescenta
 # os caminhos de sistema que as receitas dele criam em projeto.APAGAVEIS_FORA_DE_CASA.
 APAGAVEIS_FORA_DE_CASA = {str(caminhos.BACKUP_SISTEMA)} | {
-    str(c) for c in getattr(projeto, "APAGAVEIS_FORA_DE_CASA", ())}
+    str(c) for c in getattr(projeto, "APAGAVEIS_FORA_DE_CASA", ())} | {
+    # fontes de terceiros da pagina de programas (fonte-externa.sh)
+    *programas.ARQUIVOS_DE_FONTE}
+
+# Fora da pasta pessoal, o root so devolve da copia de seguranca o que estiver
+# aqui (arquivos de sistema que as receitas alteram, e nao criam). Cada projeto
+# acrescenta os seus em projeto.RESTAURAVEIS_FORA_DE_CASA.
+RESTAURAVEIS_FORA_DE_CASA = {str(c) for c in getattr(projeto, "RESTAURAVEIS_FORA_DE_CASA", ())}
+
+
+def _normalizado(caminho: Path) -> bool:
+    # o diario e a lista ficam numa pasta da pessoa: so caminho absoluto e
+    # normalizado (sem "..") e levado a serio
+    return diario.caminho_valido(str(caminho))
 
 
 def _apagavel(caminho: Path) -> bool:
-    if _da_pessoa(caminho):
-        # link na casa que aponta para fora: so o link sai, mas nem isso se o
-        # alvo nao for da pessoa
-        return not caminho.is_symlink() or _da_pessoa(caminho.resolve())
+    if not _normalizado(caminho):
+        return False
+    casa = Path.home()
+    if caminho.is_relative_to(casa):
+        # o caminho de verdade (link resolvido) tambem tem de ficar na casa, e
+        # nunca a casa inteira nem uma pasta logo abaixo dela (Documentos, .config...)
+        real = Path(os.path.realpath(caminho))
+        return real.is_relative_to(casa) and len(real.relative_to(casa).parts) >= 2
     return str(caminho) in APAGAVEIS_FORA_DE_CASA
 
 
@@ -133,7 +160,7 @@ def _limpar_vazias(pasta: Path, diz: Diz) -> None:
 
 
 def _apagar(caminho: Path, diz: Diz) -> None:
-    if caminho in PROTEGIDOS or len(caminho.parts) < 3:
+    if not _normalizado(caminho) or caminho in PROTEGIDOS or len(caminho.parts) < 3:
         diz(f"  atencao: {caminho} nao e apagado (caminho protegido)")
         return
     if not _apagavel(caminho):
@@ -155,14 +182,24 @@ def _apagar(caminho: Path, diz: Diz) -> None:
 
 
 def _voltar_copia(caminho: Path, diz: Diz) -> None:
+    if not _normalizado(caminho):
+        diz(f"  atencao: caminho invalido no diario, ignorado: {caminho}")
+        return
     if not _da_pessoa(caminho):
-        # do sistema: so da copia que o root guardou, nunca da pasta da pessoa
+        # do sistema: so o que esta na lista fixa, e so da copia que o root
+        # guardou, nunca da pasta da pessoa
+        if str(caminho) not in RESTAURAVEIS_FORA_DE_CASA | APAGAVEIS_FORA_DE_CASA:
+            diz(f"  atencao: {caminho} fora da lista do projeto; confira a mao")
+            return
         copia = estado.copia_do_sistema(caminho)
-        if _rodar(["sudo", "-n", "test", "-e", str(copia)], diz) != 0:
+        # a copia resolvida (links incluidos) tem de continuar na pasta do root
+        real = _saida_root(["realpath", "-e", "--", str(copia)])
+        if not real.startswith(str(caminhos.BACKUP_SISTEMA) + "/"):
             diz(f"  atencao: sem copia de seguranca de {caminho}; fica como esta")
             return
+        copia = Path(real)
         _rodar(["sudo", "-n", "rm", "-rf", str(caminho)], diz)
-        if _rodar(["sudo", "-n", "cp", "-a", str(copia), str(caminho)], diz) != 0:
+        if _rodar(["sudo", "-n", "cp", "-a", "--", str(copia), str(caminho)], diz) != 0:
             diz(f"  nao consegui devolver {caminho}")
             return
         diz(f"  devolvido {caminho}")
@@ -377,11 +414,15 @@ def previa_remocao() -> dict:
     # na lista fixa aparece para conferir a mao (e nunca e apagado)
     conferir = sorted({e["caminho"] for e in itens if e.get("tipo") == "criado" and e.get("caminho")
                        and not _apagavel(Path(e["caminho"])) and Path(e["caminho"]).exists()})
+    # o que a pagina de programas acrescentou ao apt (fonte-externa.sh), so o
+    # que nao existia antes e esta na lista fixa
+    fontes = sorted({c for e in itens if e.get("tipo") == "fonte_externa" for c in e.get("criados", [])
+                     if c in programas.ARQUIVOS_DE_FONTE and Path(c).exists()})
     # dependencias que o apt trouxe junto; so saem as que ninguem mais usa, depois dos pacotes
     dependencias = sorted({d for e in itens if e.get("tipo") == "pacotes" for d in e.get("dependencias", [])}
                           - set(pacotes) - {f["nome"] for f in ficam})
     return {"pacotes": pacotes, "ficam": ficam, "pastas_do_projeto": pastas, "origem": origem,
-            "conferir": conferir,
+            "conferir": conferir, "fontes_externas": fontes,
             "mudancas": len(itens), "dependencias": dependencias}
 
 
@@ -430,6 +471,9 @@ def _remover(diz: Diz) -> int:
             if _rodar(["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "remove", "-y", *novas], diz) != 0:
                 diz("  atencao: nao consegui tirar as dependencias; sudo apt autoremove limpa depois")
         _dependencias_anotadas(previa.get("dependencias", []), diz)
+    # fontes de terceiros que a pagina de programas acrescentou ao apt
+    for arquivo in previa.get("fontes_externas", []):
+        _apagar(Path(arquivo), diz)
     # por ultimo: o log, o diario e as copias que as etapas anteriores ainda usaram
     for pasta in previa["pastas_do_projeto"]:
         if Path(pasta) == caminhos.BACKUP_SISTEMA:

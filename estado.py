@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -41,7 +42,7 @@ def quando(ident: str) -> str:
 def marcar(ident: str) -> None:
     caminhos.preparar()
     try:
-        marca(ident).write_text(_agora() + "\n")
+        caminhos.escrever(marca(ident), _agora() + "\n")
     except OSError:
         pass
 
@@ -61,7 +62,8 @@ def copia_de_seguranca(alvo: Path) -> bool:
     So guarda a primeira versao: o objetivo e poder voltar ao estado anterior
     ao programa, nao ter historico de cada execucao.
     """
-    alvo = Path(alvo).expanduser()
+    # normalizado: um ".." no caminho faria a copia cair fora da pasta de copias
+    alvo = Path(os.path.abspath(Path(alvo).expanduser()))
     if not alvo.exists():
         return False
     if not da_pessoa(alvo):
@@ -87,7 +89,12 @@ def da_pessoa(caminho: Path) -> bool:
 
 
 def copia_do_sistema(alvo: Path) -> Path:
-    return caminhos.BACKUP_SISTEMA / str(alvo).lstrip("/")
+    """Onde fica a copia (do root) de um arquivo do sistema. So caminho
+    absoluto e normalizado: com ".." a copia sairia da pasta das copias."""
+    bruto = str(alvo)
+    if not bruto.startswith("/") or bruto.startswith("//") or os.path.normpath(bruto) != bruto:
+        raise ValueError(f"caminho invalido para copia do sistema: {bruto}")
+    return caminhos.BACKUP_SISTEMA / bruto.lstrip("/")
 
 
 def _sudo(*argumentos: str) -> bool:
@@ -102,7 +109,11 @@ def _copia_do_sistema(alvo: Path) -> bool:
     """Arquivo fora da casa: a copia vai para a pasta do root (0700), e so dali
     o desfazer devolve. Uma copia na pasta da pessoa poderia ser trocada por
     ela antes de o root a por de volta em /etc."""
-    destino = copia_do_sistema(alvo)
+    try:
+        destino = copia_do_sistema(alvo)
+    except ValueError as erro:
+        registrar(str(erro))
+        return False
     if _sudo("test", "-e", str(destino)):
         return True
     ok = (_sudo("install", "-d", "-m", "0700", "-o", "root", "-g", "root", str(caminhos.BACKUP_SISTEMA))

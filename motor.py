@@ -81,6 +81,27 @@ APT_SEM_PERGUNTAS = ["-o", "Dpkg::Options::=--force-confdef",
 # ref de git com 40 hexadecimais e um commit fixo (ver passo_git)
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 
+# Copia como root de uma pasta da pessoa (copiar com root = true). Nunca cp -a
+# direto: levaria o dono (a pessoa) para /usr/share ou /etc, e ela poderia
+# trocar o arquivo depois. O root copia antes para uma pasta so dele (mktemp
+# -d), recusa link simbolico e arquivo especial, tira escrita de outros e
+# setuid, e so entao poe no lugar, ja como dono.
+INSTALAR_COMO_ROOT = r'''
+set -eu
+t=$(mktemp -d)
+trap 'rm -rf "$t"' EXIT
+cp -R -P --no-preserve=ownership -- "$1" "$t/x"
+if [ -n "$(find "$t/x" ! -type f ! -type d -print -quit)" ]; then
+  echo "recusado: link simbolico ou arquivo especial em $1" >&2
+  exit 1
+fi
+chown -R root:root "$t/x"
+chmod -R go-w,u-s,g-s "$t/x"
+mkdir -p -- "$(dirname -- "$2")"
+rm -rf -- "$2"
+mv -T -- "$t/x" "$2"
+'''
+
 
 class ErroDePasso(Exception):
     pass
@@ -236,60 +257,53 @@ class Motor:
         self.diz(f"  bloco '{marca}' em {destino}")
 
     def passo_git(self, p: dict) -> None:
-        """Clona ou atualiza um repositorio.
+        """Clona ou atualiza um repositorio num commit exato (40 hex), conferido.
 
-        Para codigo de terceiros que vai rodar aqui (instalador de tema, de
-        icones), o ref deve ser um commit (40 hexadecimais), nao um ramo: o que
-        roda e sempre o que foi conferido. Para atualizar, pegue o commit novo
-        com `git ls-remote URL HEAD`, leia o que mudou e troque o ref.
+        So commit fixo: um ramo (main, master, HEAD) mudaria por baixo do
+        projeto, e o que roda tem de ser sempre o que foi conferido. Para
+        atualizar, pegue o commit novo com `git ls-remote URL HEAD`, leia o que
+        mudou e troque o ref. O git roda sem os hooks do clone (que ficam numa
+        pasta do usuario) e sem perguntar nada no terminal; o resultado tem de
+        ser exatamente o commit pedido, com a arvore limpa, senao o passo falha
+        em vez de seguir com o que estava la.
         """
         destino = self._caminho(p["destino"])
         url = resolver(p["url"], self.ctx)
-        ref = resolver(p.get("ref", "HEAD"), self.ctx)
+        ref = resolver(p.get("ref", ""), self.ctx)
+        if not _COMMIT.fullmatch(ref):
+            raise ErroDePasso(f"repositorio sem commit fixo (ref = {ref or 'vazio'}): {url}")
         if self.simular:
-            self.diz(f"  [simulacao] clonaria {url} ({ref}) em {destino}")
+            self.diz(f"  [simulacao] buscaria {url} no commit {ref[:12]} em {destino}")
             return
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        if _COMMIT.fullmatch(ref):
-            self._git_commit(destino, url, ref)
-            return
-        if (destino / ".git").is_dir():
-            self.diz(f"  atualizando {destino.name}")
-            self._executa(["git", "-C", str(destino), "remote", "set-url", "origin", url])
-            if self._executa(["git", "-C", str(destino), "fetch", "--depth", "1",
-                              "origin", ref]) == 0:
-                self._executa(["git", "-C", str(destino), "checkout", "-f", "FETCH_HEAD"])
-            return
-        self.diz(f"  clonando {destino.name}")
-        if self._executa(["git", "clone", "--depth", "1", "--branch", ref, url,
-                          str(destino)]) != 0:
-            if self._executa(["git", "clone", "--depth", "1", url, str(destino)]) != 0:
-                raise ErroDePasso(f"nao consegui clonar {url}")
-        self._anotar("criado", caminho=str(destino))
-
-    def _git_commit(self, destino: Path, url: str, commit: str) -> None:
-        """Busca so aquele commit (o GitHub aceita fetch por hash) e confere."""
+        git = ["env", "GIT_TERMINAL_PROMPT=0", "git", "-c", "core.hooksPath=/dev/null", "-C", str(destino)]
         novo = not (destino / ".git").is_dir()
         if novo:
-            self.diz(f"  clonando {destino.name} em {commit[:12]}")
-            if destino.exists():
+            self.diz(f"  clonando {destino.name} em {ref[:12]}")
+            # sobra de uma tentativa anterior (sem .git): comeca do zero
+            if destino.is_symlink():
+                destino.unlink()
+            elif destino.exists():
                 shutil.rmtree(destino, ignore_errors=True)
-            if self._executa(["git", "init", "-q", str(destino)]) != 0:
+            destino.mkdir(parents=True)
+            if self._executa([*git, "init", "-q"]) != 0:
                 raise ErroDePasso(f"nao consegui criar {destino}")
-            self._executa(["git", "-C", str(destino), "remote", "add", "origin", url])
-        else:
-            self.diz(f"  atualizando {destino.name} para {commit[:12]}")
-            self._executa(["git", "-C", str(destino), "remote", "set-url", "origin", url])
-        if self._executa(["git", "-C", str(destino), "fetch", "-q", "--depth", "1",
-                          "origin", commit]) != 0 or \
-           self._executa(["git", "-C", str(destino), "checkout", "-q", "-f", "FETCH_HEAD"]) != 0:
-            raise ErroDePasso(f"nao consegui buscar {url} no commit {commit[:12]}")
-        atual = subprocess.run(["git", "-C", str(destino), "rev-parse", "HEAD"],
-                               capture_output=True, text=True).stdout.strip()
-        if atual != commit:
-            raise ErroDePasso(f"{destino.name} ficou em {atual[:12] or '?'}, esperava {commit[:12]}")
-        if novo:
             self._anotar("criado", caminho=str(destino))
+            self._executa([*git, "remote", "add", "origin", url])
+        else:
+            self.diz(f"  atualizando {destino.name} para {ref[:12]}")
+            self._executa([*git, "remote", "set-url", "origin", url])
+        if self._executa([*git, "fetch", "-q", "--depth", "1", "origin", ref]) != 0:
+            raise ErroDePasso(f"nao consegui buscar {url} no commit {ref[:12]}")
+        if self._executa([*git, "checkout", "-q", "-f", "--detach", "FETCH_HEAD"]) != 0:
+            raise ErroDePasso(f"nao consegui usar o commit {ref[:12]} de {url}")
+        if self._executa([*git, "clean", "-q", "-ffdx"]) != 0:
+            raise ErroDePasso(f"nao consegui limpar {destino}")
+        atual = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL).stdout.strip()
+        sujo = subprocess.run([*git, "status", "--porcelain", "--ignored"], capture_output=True,
+                              text=True, stdin=subprocess.DEVNULL).stdout.strip()
+        if atual != ref or sujo:
+            raise ErroDePasso(f"{destino.name} nao ficou no commit {ref[:12]} com a arvore limpa")
 
     def passo_comando(self, p: dict) -> None:
         argumentos = [str(x) for x in resolver(p["argumentos"], self.ctx)]
@@ -353,9 +367,8 @@ class Motor:
         if existia:
             estado.copia_de_seguranca(destino)
         if p.get("root"):
-            self._executa(["mkdir", "-p", str(destino.parent)], root=True)
-            self._executa(["rm", "-rf", str(destino)], root=True)
-            if self._executa(["cp", "-a", str(origem), str(destino)], root=True) != 0:
+            if self._executa(["sh", "-c", INSTALAR_COMO_ROOT, "_", str(origem), str(destino)],
+                             root=True) != 0:
                 raise ErroDePasso(f"nao consegui copiar para {destino}")
         else:
             destino.parent.mkdir(parents=True, exist_ok=True)

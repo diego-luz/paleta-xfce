@@ -41,47 +41,66 @@ esac
 
 preferencias="/etc/apt/preferences.d/$fonte"
 
+# sem o gpg nao da para conferir de quem e a chave (nem a nova, nem a que ja
+# estava): ele vem primeiro, e sem ele nada entra no apt
+if ! command -v gpg >/dev/null; then
+  echo "instalando o gpg, para conferir a chave"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold --no-install-recommends gpg >/dev/null || true
+fi
+command -v gpg >/dev/null || { echo "gpg ausente: nao da para conferir a chave; nada foi acrescentado" >&2; exit 1; }
+
+tmp="$(mktemp)"
+binaria="$(mktemp)"
+gpg_casa="$(mktemp -d)"
+trap 'rm -rf "$tmp" "$binaria" "$gpg_casa"' EXIT
+
+# impressoes das chaves principais do arquivo, uma por linha
+impressoes_de() {
+  GNUPGHOME="$gpg_casa" gpg --batch --show-keys --with-colons "$1" 2>/dev/null \
+    | awk -F: '$1=="pub"{p=1;next} $1=="fpr"&&p{print $10;p=0}'
+}
+
 if [ -f "$chaveiro" ] && [ -f "$lista" ]; then
+  # a que ja estava tambem precisa ser exatamente a esperada, e so ela
+  achadas="$(impressoes_de "$chaveiro")"
+  if [ "$achadas" != "$impressao" ]; then
+    echo "a chave em $chaveiro nao e a esperada (${achadas:-ilegivel}); confira antes de continuar" >&2
+    exit 1
+  fi
   echo "a fonte $fonte ja estava configurada"
 else
-  # sem o gpg nao da para conferir de quem e a chave: entao nada entra no apt
-  if ! command -v gpg >/dev/null; then
-    echo "instalando o gpg, para conferir a chave"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -q -o Dpkg::Options::=--force-confdef \
-      -o Dpkg::Options::=--force-confold --no-install-recommends gpg >/dev/null || true
-  fi
-  command -v gpg >/dev/null || { echo "gpg ausente: nao da para conferir a chave; nada foi acrescentado" >&2; exit 1; }
-
   echo "baixando a chave de $url_chave"
-  tmp="$(mktemp)"
-  gpg_casa="$(mktemp -d)"
-  trap 'rm -rf "$tmp" "$gpg_casa"' EXIT
   curl -fsSL --max-time 40 "$url_chave" -o "$tmp"
   [ -s "$tmp" ] || { echo "a chave veio vazia" >&2; exit 1; }
 
   # a chave baixada tem de ser exatamente a do dono do repositorio, e so ela
-  achadas="$(GNUPGHOME="$gpg_casa" gpg --show-keys --with-colons "$tmp" 2>/dev/null \
-    | awk -F: '$1=="pub"{p=1;next} $1=="fpr"&&p{print $10;p=0}')"
+  achadas="$(impressoes_de "$tmp")"
   if [ "$achadas" != "$impressao" ]; then
     echo "a chave de $fonte nao confere (${achadas:-ilegivel}, esperava $impressao); nada foi acrescentado" >&2
     exit 1
   fi
 
-  # guarda a chave em chaveiro proprio e amarra a fonte a ela com signed-by,
-  # para que esta chave nao valide nenhum outro repositorio do sistema
-  GNUPGHOME="$gpg_casa" gpg --dearmor --yes --output "$chaveiro" < "$tmp"
-  chmod 0644 "$chaveiro"
+  # so a chave com a impressao esperada vai para o chaveiro: importa numa casa
+  # do gpg temporaria e exporta por impressao, conferindo de novo o resultado
+  GNUPGHOME="$gpg_casa" gpg --batch --quiet --import "$tmp" 2>/dev/null
+  GNUPGHOME="$gpg_casa" gpg --batch --export "$impressao" > "$binaria"
+  [ "$(impressoes_de "$binaria")" = "$impressao" ] \
+    || { echo "a chave exportada de $fonte nao confere; nada foi acrescentado" >&2; exit 1; }
 
-  printf '%s\n' "$linha" > "$lista"
-  chmod 0644 "$lista"
+  # chaveiro proprio, amarrado a fonte com signed-by: esta chave nao valida
+  # nenhum outro repositorio do sistema
+  install -m 0644 "$binaria" "$chaveiro"
+  printf '%s\n' "$linha" > "$tmp"
+  install -m 0644 "$tmp" "$lista"
   echo "fonte adicionada em $lista"
 fi
 
-# o repositorio de fora so serve os pacotes para que foi acrescentado: nao pode
-# trocar outros pacotes do Debian por versoes dele
-printf 'Package: *\nPin: origin %s\nPin-Priority: 100\n\nPackage: %s\nPin: origin %s\nPin-Priority: 500\n' \
-  "$origem" "$pacotes" "$origem" > "$preferencias"
-chmod 0644 "$preferencias"
+# o repositorio de fora so serve os pacotes para que foi acrescentado: nenhum
+# outro pacote vem dele (-1), nem troca os do Debian
+printf 'Package: *\nPin: origin %s\nPin-Priority: -1\n\nPackage: %s\nPin: origin %s\nPin-Priority: 500\n' \
+  "$origem" "$pacotes" "$origem" > "$tmp"
+install -m 0644 "$tmp" "$preferencias"
 
 echo "atualizando o indice apenas desta fonte"
 apt-get update -o Dir::Etc::sourcelist="$lista" \

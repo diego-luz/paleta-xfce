@@ -14,9 +14,20 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from . import caminhos, hardware, sistema
+from . import caminhos, diario, hardware, sistema
 
 LIMITE = 60          # pacotes por operacao
+
+# o que o fonte-externa.sh pode criar no sistema (chave, lista e preferencias
+# de cada fonte); o desfazer com "apagar" so tira estes, e so os que nao
+# existiam antes (anotados no diario como fonte_externa)
+FONTES_EXTERNAS = ("microsoft-vscode", "docker")
+ARQUIVOS_DE_FONTE = {
+    f"{pasta}/{nome}{fim}"
+    for nome in FONTES_EXTERNAS
+    for pasta, fim in (("/usr/share/keyrings", ".gpg"), ("/etc/apt/sources.list.d", ".list"),
+                       ("/etc/apt/preferences.d", ""))
+}
 
 
 def catalogo() -> dict:
@@ -157,7 +168,13 @@ def _instalar(pacotes: list[str], diz: Callable[[str], None]) -> int:
     for pedido in fontes_necessarias(pacotes):
         diz(f"habilitando a fonte de {pedido['nome']}: {pedido['fonte']}")
         roteiro = caminhos.ARQUIVOS / "fonte-externa.sh"
+        antes = {c for c in ARQUIVOS_DE_FONTE if Path(c).exists()}
         codigo = _correr([*COMO_ROOT, "bash", str(roteiro), pedido["fonte"]], diz)
+        # anotado para o desfazer com "apagar": so o que este passo criou
+        criados = sorted(c for c in ARQUIVOS_DE_FONTE - antes if Path(c).exists())
+        if criados:
+            diario.anotar("fonte_externa", receita="programas", fonte=pedido["fonte"],
+                          criados=criados)
         if codigo != 0:
             diz("nao consegui habilitar a fonte; nada foi instalado")
             return codigo
