@@ -22,10 +22,12 @@ dizer = "guardando a barra do jeito que esta"
 tolera_falha = true
 corpo = '''
 antes="$CTX_ESTADO_DIR/painel-antes.tar.bz2"
-if [ ! -f "$antes" ] && command -v xfce4-panel-profiles >/dev/null; then
+# se nao der para guardar, fica a marca: numa rodada seguinte a barra ja e a
+# do projeto, e guardar essa como "a de antes" faria o desfazer devolve-la
+if [ ! -f "$antes" ] && [ ! -f "$antes.sem" ] && command -v xfce4-panel-profiles >/dev/null; then
   mkdir -p "$CTX_ESTADO_DIR"
   xfce4-panel-profiles save "$antes" >/dev/null 2>&1 && echo "barra de antes guardada" \
-    || echo "atencao: nao consegui guardar a barra de antes"
+    || { echo "atencao: nao consegui guardar a barra de antes"; : > "$antes.sem"; }
 fi
 '''
 
@@ -209,9 +211,14 @@ tolera_falha = true
 corpo = '''
 antes="$CTX_ESTADO_DIR/painel-antes.tar.bz2"
 if [ -f "$antes" ] && command -v xfce4-panel-profiles >/dev/null; then
-  xfce4-panel-profiles load "$antes" >/dev/null 2>&1 && echo "barra de antes carregada" \
-    || echo "atencao: o xfce4-panel-profiles nao carregou a barra de antes"
+  # carregada, sai: a proxima instalacao guarda a barra de entao
+  if xfce4-panel-profiles load "$antes" >/dev/null 2>&1; then
+    echo "barra de antes carregada"; rm -f "$antes"
+  else
+    echo "atencao: o xfce4-panel-profiles nao carregou a barra de antes"
+  fi
 else
   echo "atencao: sem copia da barra de antes; ela fica como esta"
 fi
+rm -f "$antes.sem"
 '''

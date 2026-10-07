@@ -13,11 +13,13 @@ tolera_falha = true
 argumentos = ["apt-get", "update"]
 
 # guarda e devolve a barra inteira, com os arquivos dos plugins; a receita da
-# barra guarda a de antes com ele, e o desfazer carrega de volta
+# barra guarda a de antes com ele, e o desfazer carrega de volta. O pacote do
+# Debian nao puxa o python3-gi, sem o qual ele nem abre; o gsettings (que avisa
+# os apps GTK4 do modo) vem no libglib2.0-bin, que tambem pode faltar
 [[passo]]
 tipo = "apt"
 dizer = "o que guarda e devolve a barra"
-pacotes = ["xfce4-panel-profiles"]
+pacotes = ["xfce4-panel-profiles", "python3-gi", "libglib2.0-bin"]
 
 # sassc e companhia so servem para compilar o Gruvbox e o Everforest
 [[passo]]
