@@ -1,7 +1,7 @@
 [modulo]
 id = "40"
 nome = "barra"
-titulo = "Barra unica, sem dock"
+titulo = "Barra unica, sem dock (ou em ilhas)"
 requer = ["10"]
 afetada_por = ["barra", "barra_tarefas", "relogio", "menu", "modo"]
 
@@ -12,6 +12,13 @@ afetada_por = ["barra", "barra_tarefas", "relogio", "menu", "modo"]
 # Plugin que nao existe faz o painel abrir a janela "o plugin nao pode ser
 # carregado" na frente da pessoa, por isso cada um e conferido pelo .desktop
 # antes de entrar na lista.
+#
+# Em ilhas (barra = ilhas, vindo do d3bian-init-oasis-xfce): a barra vai num
+# perfil do xfce4-panel-profiles (paineis.py) e entra com "load", que passa
+# pelo xfconfd. Ilha solta da borda nao reserva espaco na tela; as margens do
+# xfwm4 guardam esse espaco para as janelas maximizadas, e so entram depois
+# que o load deu certo. Mudou a resolucao ou a escala? Rode de novo so esta
+# etapa: aplicar --apenas barra.
 
 # a barra inteira como era antes do projeto, uma vez so: o [[desfazer]] daqui
 # devolve com load. Fica aqui, e nao na 00, porque o xfce4-panel-profiles vem
@@ -31,8 +38,73 @@ if [ ! -f "$antes" ] && [ ! -f "$antes.sem" ] && command -v xfce4-panel-profiles
 fi
 '''
 
+# ---- barra em ilhas ----------------------------------------------------------
 [[passo]]
 tipo = "script"
+se = "barra == ilhas"
+dizer = "montando a barra em ilhas"
+corpo = '''
+command -v xfce4-panel-profiles >/dev/null || { echo "falta o xfce4-panel-profiles"; exit 1; }
+perfil="$CTX_ESTADO_DIR/painel-ilhas.tar.bz2"
+mkdir -p "$CTX_ESTADO_DIR"
+
+args=(--perfil "$perfil" --modo "$CTX_MODO" --menu "$CTX_MENU" --tarefas "$CTX_BARRA_TAREFAS"
+      --favoritos "$CTX_FAVORITOS" --relogio "$CTX_RELOGIO_FORMATO" --destaque "$CTX_DESTAQUE_COR"
+      --fundo-barra "$CTX_ILHA_FUNDO_BARRA" --fundo-ilha "$CTX_ILHA_FUNDO"
+      --menu-icone view-app-grid-symbolic
+      --menu-extra menu-width:int:420 --menu-extra menu-height:int:520
+      --menu-extra item-icon-size:int:2 --menu-extra category-icon-size:int:0)
+
+# os favoritos do dock (docklike-N.rc) que o load escreve sao anotados antes,
+# para o desfazer saber o que e novo
+while IFS= read -r f; do
+  if [ -n "$f" ]; then d3_antes "$f"; fi
+done < <(python3 "$CTX_ARQUIVOS/paineis.py" "${args[@]}" --listar)
+
+saida=$(python3 "$CTX_ARQUIVOS/paineis.py" "${args[@]}")
+printf '%s\n' "$saida" | grep -v '^margens' || true
+
+# o plugin de energia esconde o icone proprio do xfce4-power-manager ao entrar
+# na barra; anotado para o desfazer devolver como era
+case "$saida" in
+  *power-manager-plugin*) d3_xfconf xfce4-power-manager /xfce4-power-manager/show-tray-icon bool ;;
+esac
+
+# o load troca o canal xfce4-panel inteiro pelo xfconfd, escreve os arquivos
+# dos plugins e pede ao painel que reinicie
+if ! xfce4-panel-profiles load "$perfil" 2>/dev/null | tail -3; then
+  echo "o xfce4-panel-profiles nao carregou as ilhas; as margens ficam como estavam"
+  exit 1
+fi
+
+# margens do xfwm4, so com as ilhas de pe: o espaco que as janelas maximizadas
+# respeitam. O paineis.py ja da em pixels de verdade (com a escala do Xfce)
+xfwm() {
+  d3_xfconf xfwm4 "/general/$1" "$2"
+  xfconf-query -c xfwm4 -p "/general/$1" -n -t "$2" -s "$3" 2>/dev/null \
+    || xfconf-query -c xfwm4 -p "/general/$1" -s "$3" 2>/dev/null || true
+}
+read -r cima baixo <<< "$(printf '%s\n' "$saida" | sed -n 's/^margens //p')"
+xfwm margin_top int "${cima:-0}"
+xfwm margin_bottom int "${baixo:-0}"
+# anotadas, para a barra unica saber quais margens foram postas pelas ilhas
+printf '%s %s\n' "${cima:-0}" "${baixo:-0}" > "$CTX_ESTADO_DIR/margens-ilhas"
+# a sombra que o xfwm4 poe nos paineis e retangular e aparece nos cantos redondos
+xfwm show_dock_shadow bool false
+
+# painel parado (sessao sem ele): sobe agora
+sleep 3
+if [ -n "${DISPLAY:-}" ] && command -v xfce4-panel >/dev/null && ! pgrep -u "$(id -u)" -x xfce4-panel >/dev/null; then
+  setsid --fork xfce4-panel >/dev/null 2>&1 </dev/null
+  sleep 2
+fi
+echo "ilhas montadas; margens do xfwm4: em cima ${cima:-0}, embaixo ${baixo:-0}"
+'''
+
+# ---- barra unica -------------------------------------------------------------
+[[passo]]
+tipo = "script"
+se = "barra != ilhas"
 dizer = "montando a barra"
 corpo = '''
 xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
@@ -188,9 +260,47 @@ fi
 echo "barra montada com: $plugins"
 '''
 
+# saindo das ilhas: as margens e a sombra dos paineis que elas puseram voltam
+# ao que eram antes do projeto (o primeiro valor do diario); margem que a
+# pessoa mudou depois fica
+[[passo]]
+tipo = "script"
+se = "barra != ilhas"
+tolera_falha = true
+corpo = '''
+marcadas="$CTX_ESTADO_DIR/margens-ilhas"
+[ -f "$marcadas" ] || exit 0
+antes() {  # antes CHAVE PADRAO: o valor do xfwm4 antes do projeto, pelo diario
+  CHAVE="$1" PADRAO="$2" PYTHONPATH="$D3_DIARIO_PAI" "$D3_DIARIO_PYTHON" -c '
+import importlib, os
+d = importlib.import_module(os.environ["D3_DIARIO_PACOTE"] + ".diario")
+for i in d.ler():
+    if i.get("tipo") == "xfconf" and i.get("canal") == "xfwm4" and i.get("chave") == os.environ["CHAVE"]:
+        print((i.get("valor") or "").strip() if i.get("existia") else os.environ["PADRAO"])
+        break
+else:
+    print(os.environ["PADRAO"])
+'
+}
+xfwm() {
+  d3_xfconf xfwm4 "/general/$1" "$2"
+  xfconf-query -c xfwm4 -p "/general/$1" -n -t "$2" -s "$3" 2>/dev/null \
+    || xfconf-query -c xfwm4 -p "/general/$1" -s "$3" 2>/dev/null || true
+}
+read -r cima baixo < "$marcadas"
+atual=$(xfconf-query -c xfwm4 -p /general/margin_top 2>/dev/null || echo 0)
+if [ "$atual" = "${cima:-x}" ]; then xfwm margin_top int "$(antes /general/margin_top 0)"; fi
+atual=$(xfconf-query -c xfwm4 -p /general/margin_bottom 2>/dev/null || echo 0)
+if [ "$atual" = "${baixo:-x}" ]; then xfwm margin_bottom int "$(antes /general/margin_bottom 0)"; fi
+xfwm show_dock_shadow bool "$(antes /general/show_dock_shadow true)"
+rm -f "$marcadas"
+echo "margens das ilhas tiradas"
+'''
+
 # folga entre os itens e texto legivel, que o tema sozinho nao garante
 [[passo]]
 tipo = "bloco"
+se = "barra != ilhas"
 dizer = "espacamento e cor do texto da barra"
 destino = "~/.config/gtk-3.0/gtk.css"
 marca = "@@NOME@@ barra"
@@ -201,6 +311,29 @@ conteudo = '''
 .xfce4-panel.background image { color: @@painel_texto@@; }
 .xfce4-panel button,
 .xfce4-panel widget { padding-left: 6px; padding-right: 6px; }
+'''
+
+# ilhas: cantos redondos, texto legivel e botoes macios; o fundo translucido
+# vem do proprio painel (background-rgba). Com o picom, o desfoque e os cantos
+# dele usam o mesmo raio
+[[passo]]
+tipo = "bloco"
+se = "barra == ilhas"
+dizer = "cantos e cores das ilhas"
+destino = "~/.config/gtk-3.0/gtk.css"
+marca = "@@NOME@@ barra"
+conteudo = '''
+/* so a janela do painel; os plugins que rodam fora dele (menu, som, dock)
+   tambem tem .xfce4-panel.background e ficariam redondos um a um */
+#XfcePanelWindow { border-radius: @@raio@@px; }
+.xfce4-panel.background:not(#XfcePanelWindow) { border-radius: 0; }
+.xfce4-panel.background,
+.xfce4-panel.background label,
+.xfce4-panel.background button label,
+.xfce4-panel.background image { color: @@painel_texto@@; }
+.xfce4-panel.background button { border-radius: 10px; padding-left: 6px; padding-right: 6px; }
+.xfce4-panel.background button:hover { background-color: @@painel_hover@@; }
+.xfce4-panel.background button:checked { background-color: @@destaque_suave@@; }
 '''
 
 # a barra de antes foi guardada pela receita 00; o load tambem reinicia o painel

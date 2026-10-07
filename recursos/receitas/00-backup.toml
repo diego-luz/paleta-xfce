@@ -11,4 +11,6 @@ caminhos = [
   "~/.config/xfce4",
   "~/.config/gtk-3.0",
   "~/.gtkrc-2.0",
+  "~/.config/picom",
+  "~/.config/autostart",
 ]

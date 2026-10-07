@@ -51,13 +51,69 @@ publica a versão escura.
 | `icones` | Papirus, Tela na cor da paleta, Qogir, Adwaita |
 | `terminal` (cores da paleta no xfce4-terminal) | sim, não |
 | `fonte` | Inter, Cantarell, a do sistema |
-| `barra` | topo, embaixo |
+| `barra` | topo, embaixo, em ilhas |
 | `barra_tarefas` (janelas abertas na barra) | docklike, botões, nenhuma |
 | `relogio` | curto, completo, só a hora |
 | `menu` | só ícone, ícone e texto, nenhum |
 | `papel` | degradê, liso, manter o atual |
 | `icones_area` | nenhum, só removíveis, tudo |
 | `janelas` (encaixe e bordas) | sim, não |
+| `efeitos` (picom) | desligados, só sombras e cantos, desfoque e sombras |
+
+Os padrões deixam o visual de sempre: barra no topo e efeitos desligados (o
+compositor do próprio Xfce). As ilhas e o picom vêm do
+[oasis-xfce](https://git.saberdl.dev.br/d3bian-temas/oasis-xfce).
+
+## Barra em ilhas
+
+Com `barra = ilhas`, a barra solta da borda: uma barra fina no topo (menu,
+bandeja, som, energia, relógio e sair) e as janelas abertas numa ilha no meio,
+embaixo, as duas com cantos redondos e fundo um pouco translúcido. A ilha de
+baixo traz o docklike com alguns programas fixados (arquivos, terminal,
+navegador, editor de texto) e cresce com o que estiver aberto; com
+`barra_tarefas = nenhuma`, fica só a barra de cima. As cores seguem o modo
+e a paleta escolhido.
+
+As ilhas entram pelo `xfce4-panel-profiles load`. Painel solto não reserva
+espaço na tela, então o projeto põe margens no xfwm4 (Ajustes do gerenciador de
+janelas, ajustes finos, Espaços de trabalho, Margens), só depois que o `load` deu
+certo: as janelas maximizadas param antes das ilhas, e o encaixe também. As
+margens são em pixels de verdade: com a escala 2 do Xfce (telas HiDPI), elas
+saem dobradas. As posições são calculadas para o monitor principal e a escala de
+agora: mudou a resolução ou a escala, rode de novo só a barra:
+
+```sh
+python3 -m d3bian_init_paleta_xfce aplicar --apenas barra
+```
+
+Voltando para a barra no topo ou embaixo, as margens que as ilhas puseram saem
+(margem que você mudou depois fica).
+
+## Efeitos (picom)
+
+Com `efeitos` em **só sombras** ou **desfoque**, o picom desenha sombras e cantos
+redondos nas janelas (e, com desfoque, o fundo atrás do que é translúcido fica
+embaçado). Com o picom ligado, o compositor do próprio xfwm4 fica desligado (os
+dois juntos brigam pela tela) e o picom inicia junto com a sessão
+(`~/.config/autostart/d3bian-paleta-picom.desktop`, que chama o
+`~/.local/bin/d3bian-picom`). Antes de escrever o `picom.conf`, o projeto confere
+o vídeo: com `glxinfo` dizendo `llvmpipe` (ou sem renderização direta), numa
+placa de vídeo de VM sem 3D, ou numa VM sem como confirmar, o picom roda
+**leve**: `xrender`, sem desfoque e sem vsync. Se o picom não ficar de pé (agora
+ou ao entrar na sessão), o `d3bian-picom` liga de volta o compositor do xfwm4.
+Com os efeitos **desligados**, o picom deste projeto para e o compositor do xfwm4
+volta ao que era antes de o picom ligar. Um picom que você mesmo abriu, com
+outra configuração, nunca é fechado pelo projeto.
+
+## Encaixe de janelas
+
+Com `janelas = sim`: Super e as setas para metades e maximizar, Super+1 a 4 para
+os quartos (do próprio xfwm4), Super+C centraliza, Super+X ocupa quase a tela
+toda, Super+Shift e as setas dividem em terços e Super+Z abre um quadro de
+layouts. Arrastar a janela até a borda também encaixa. O `d3bian-janelas` e o
+`d3bian-layouts` descontam as margens do xfwm4, então com as ilhas nada fica por
+baixo delas. Os atalhos levam o caminho entre aspas, para a pasta pessoal com
+espaço.
 
 ## O que fica onde
 
@@ -71,7 +127,10 @@ publica a versão escura.
 | `~/.local/share/backgrounds/paleta` | papel de parede desenhado pelo ImageMagick |
 | `~/.local/bin/d3bian-janelas`, `d3bian-layouts`, `d3bian-bordas` | encaixe, layouts e bordas de janela |
 | `~/.local/share/applications/xfce4-terminal.desktop` | nova janela e nova aba no clique direito do terminal |
-| `~/.config/gtk-3.0/settings.ini`, `gtk.css`, `~/.gtkrc-2.0` | tema e fonte para os programas GTK |
+| `~/.config/gtk-3.0/settings.ini`, `gtk.css` | tema e fonte para os programas GTK, e os cantos das ilhas |
+| `~/.gtkrc-2.0` | tema dos programas GTK 2, num bloco marcado |
+| `~/.local/state/d3bian-init-paleta-xfce/painel-ilhas.tar.bz2` | o perfil das ilhas, carregado pelo `xfce4-panel-profiles` |
+| `~/.config/picom/picom.conf`, `~/.config/autostart/d3bian-paleta-picom.desktop`, `~/.local/bin/d3bian-picom` | efeitos |
 | xfconf (`xsettings`, `xfwm4`, `xfce4-panel`, `xfce4-desktop`, `xfce4-terminal`, `xfce4-keyboard-shortcuts`) | tema, ícones, fonte, barra, área de trabalho, cores do terminal e atalhos |
 
 ## Sistemas
@@ -87,3 +146,7 @@ Em Ajustes, **Voltar ao que era antes**, ou `restaurar --sim`. A barra volta pel
 `xfce4-panel-profiles`; temas e ícones baixados saem porque as receitas anotam
 cada pasta antes de criar. Com **Remover também o que foi instalado** saem os
 pacotes que o projeto instalou.
+
+O picom deste projeto para, e o compositor do xfwm4, as margens e a sombra dos
+painéis voltam pelo diário. O `~/.gtkrc-2.0` perde o bloco marcado (e some, se
+só existia pelo projeto).
