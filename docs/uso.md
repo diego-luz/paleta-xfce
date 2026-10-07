@@ -7,7 +7,7 @@
 Clone com o nome da pasta igual ao do pacote Python (com `_`) e rode como módulo:
 
 ```sh
-git clone https://git.saberdl.dev.br/d3bian/paleta-xfce.git d3bian_init_paleta_xfce
+git clone https://git.saberdl.dev.br/d3bian-temas/paleta-xfce.git d3bian_init_paleta_xfce
 python3 -m d3bian_init_paleta_xfce            # pede a senha uma vez e abre o painel
 python3 -m d3bian_init_paleta_xfce aplicar --simular
 ```

@@ -3,7 +3,7 @@
 [← voltar ao README](../README.md)
 
 Painel em Python puro (só a biblioteca padrão) com HTML/JS sem dependências.
-O motor, o servidor e as telas comuns vêm do [modelo](https://git.saberdl.dev.br/d3bian/modelo);
+O motor, o servidor e as telas comuns vêm do [modelo](https://git.saberdl.dev.br/d3bian-temas/modelo);
 os detalhes deles e as armadilhas conhecidas estão em [nucleo.md](nucleo.md).
 
 ## Receitas
