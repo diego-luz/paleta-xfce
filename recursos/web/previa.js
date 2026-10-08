@@ -173,6 +173,11 @@ const Previa = (() => {
     const fundo = el("div", "pv-login-fundo" + (e.login_desfoque !== "nao" ? " desfocado" : "")
                      + (e.modo === "claro" ? " claro" : ""));
     pintar(fundo, fundoDoLogin(e));
+    // escolhido a mao: o mesmo escurecimento da receita; no automatico vale o CSS
+    if (e.login_escurecer && e.login_escurecer !== "auto"){
+      const esc = Math.min(90, parseInt(e.login_escurecer, 10) || 0);
+      fundo.style.filter = (e.login_desfoque !== "nao" ? "blur(6px) " : "") + `brightness(${1 - esc / 100})`;
+    }
     const topo = el("div", "pv-login-topo", `${RELOGIO.curto}  ⏻`);
     const meio = el("div", "pv-login-meio");
     meio.appendChild(el("div", "pv-foto"));

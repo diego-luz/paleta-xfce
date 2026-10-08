@@ -3,7 +3,7 @@ id = "80"
 nome = "login"
 titulo = "Tela de login e de bloqueio"
 requer = ["10"]
-afetada_por = ["login", "login_fundo", "login_desfoque", "login_usuarios", "paleta", "modo",
+afetada_por = ["login", "login_fundo", "login_desfoque", "login_escurecer", "login_usuarios", "paleta", "modo",
                "fonte", "papel"]
 
 # Trazida do d3bian-init-oasis-xfce: fundo do papel de parede (desfocado ou
@@ -100,17 +100,20 @@ if [ -z "$origem" ] || [ ! -f "$origem" ]; then
 fi
 if [ -n "$origem" ] && [ -f "$origem" ]; then
   # o texto da tela e branco: o fundo escurece um pouco, e bem mais no modo
-  # claro, em que o papel da paleta e quase branco
-  if [ "$CTX_GTK_ESCURO" = 1 ]; then escurece=32; else escurece=48; fi
+  # claro, em que o papel da paleta e quase branco; ou o quanto a pessoa escolheu
+  if [ "$CTX_GTK_ESCURO" = 1 ]; then auto=32; else auto=48; fi
+  [ "$CTX_LOGIN_DESFOQUE" = "sim" ] || auto=$((auto - 10))
+  esc="${CTX_LOGIN_ESCURECER:-auto}"
+  case "$esc" in ''|*[!0-9]*) esc=$auto ;; esac
+  [ "$esc" -le 90 ] || esc=90
   if [ "$CTX_LOGIN_DESFOQUE" = "sim" ]; then
     # reduzir antes de desfocar deixa o desfoque rapido; o greeter estica de volta
-    convert "$origem[0]" -resize '1920x1200^' -blur 0x24 -fill black -colorize "$escurece%" \
+    convert "$origem[0]" -resize '1920x1200^' -blur 0x24 -fill black -colorize "$esc%" \
             -quality 88 "$d/fundo.jpg"
   else
-    convert "$origem[0]" -resize '2560x1600>' -fill black -colorize "$((escurece - 10))%" \
-            -quality 90 "$d/fundo.jpg"
+    convert "$origem[0]" -resize '2560x1600>' -fill black -colorize "$esc%" -quality 90 "$d/fundo.jpg"
   fi
-  echo "fundo: $(basename "$origem")$([ "$CTX_LOGIN_DESFOQUE" = "sim" ] && echo ', desfocado')"
+  echo "fundo: $(basename "$origem")$([ "$CTX_LOGIN_DESFOQUE" = "sim" ] && echo ', desfocado'), escurecido $esc%"
 else
   convert -size 1920x1200 "gradient:$CTX_PAPEL_COR_CIMA-$CTX_PAPEL_COR_BAIXO" \
           -fill black -colorize "$([ "$CTX_GTK_ESCURO" = 1 ] && echo 20 || echo 42)%" "$d/fundo.jpg"
