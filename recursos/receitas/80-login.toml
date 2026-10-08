@@ -1,0 +1,176 @@
+[modulo]
+id = "80"
+nome = "login"
+titulo = "Tela de login e de bloqueio"
+requer = ["10"]
+afetada_por = ["login", "login_fundo", "login_desfoque", "login_usuarios", "paleta", "modo",
+               "fonte", "papel"]
+
+# Trazida do d3bian-init-oasis-xfce: fundo do papel de parede (desfocado ou
+# nao) ou de uma imagem escolhida na pagina, foto redonda, campos de vidro e o
+# botao de entrar na cor de destaque da paleta. A tela de bloqueio e
+# o mesmo greeter, entao muda junto.
+#
+# Os arquivos sao montados em @@login_dir@@, uma pasta da pessoa e fechada
+# (0700), e so depois levados para o sistema: o root copia cada um para uma
+# pasta nova dele, recusando link simbolico, e instala de la.
+
+# ---- desligado: volta a tela de login do sistema ----------------------------
+
+[[passo]]
+tipo = "script"
+se = "login != sim"
+dizer = "tirando a tela de login do projeto"
+tolera_falha = true
+corpo = '''
+existe=0
+for f in "$CTX_LOGIN_RAIZ" "$CTX_LOGIN_TEMA_DIR" "$CTX_LOGIN_GREETER_CONF" "$CTX_LOGIN_LIGHTDM_CONF"; do
+  [ -e "$f" ] && existe=1
+done
+[ "$existe" = 1 ] || { echo "a tela de login do projeto nao esta instalada"; exit 0; }
+d3_antes "$CTX_LOGIN_RAIZ" "$CTX_LOGIN_TEMA_DIR" "$CTX_LOGIN_GREETER_CONF" "$CTX_LOGIN_LIGHTDM_CONF"
+sudo -n rm -rf -- "$CTX_LOGIN_RAIZ" "$CTX_LOGIN_TEMA_DIR" "$CTX_LOGIN_GREETER_CONF" "$CTX_LOGIN_LIGHTDM_CONF"
+echo "volta a tela de login do sistema no proximo reinicio"
+'''
+
+# ---- ligado ------------------------------------------------------------------
+
+[[passo]]
+tipo = "apt"
+se = "login == sim"
+pacotes = ["lightdm-gtk-greeter", "imagemagick"]
+
+# a pasta de montagem: da pessoa, fechada e nao um link. Comeca vazia
+[[passo]]
+tipo = "script"
+se = "login == sim"
+corpo = '''
+d="$CTX_LOGIN_DIR"
+if [ -L "$d" ]; then echo "pasta de montagem do login e um link: $d" >&2; exit 1; fi
+mkdir -p -m 700 "$d"
+chmod 700 "$d"
+if [ ! -O "$d" ] || [ "$(stat -c %a "$d")" != 700 ]; then
+  echo "pasta de montagem do login invalida: $d" >&2
+  exit 1
+fi
+find "$d" -mindepth 1 -delete
+'''
+
+[[passo]]
+tipo = "arquivo"
+se = "login == sim"
+dizer = "montando o tema da tela de login"
+destino = "@@login_dir@@/gtk.css"
+modelo = "login-gtk.css"
+
+[[passo]]
+tipo = "arquivo"
+se = "login == sim"
+destino = "@@login_dir@@/greeter.conf"
+modelo = "login-greeter.conf"
+
+[[passo]]
+tipo = "arquivo"
+se = "login == sim"
+destino = "@@login_dir@@/lightdm.conf"
+conteudo = '''
+# Escrito pelo d3bian-init-paleta-xfce.
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+# true mostra os campos de nome e senha; false, a lista de usuarios
+greeter-hide-users=@@login_esconder_usuarios@@
+greeter-show-manual-login=true
+user-session=xfce
+'''
+
+[[passo]]
+tipo = "script"
+se = "login == sim"
+dizer = "preparando o fundo e a foto"
+corpo = '''
+d="$CTX_LOGIN_DIR"
+origem="$CTX_LOGIN_FUNDO_ARQUIVO"
+if [ "$CTX_LOGIN_FUNDO" = "propria" ] && [ -z "$origem" ]; then
+  echo "atencao: nenhuma imagem escolhida (nem login.jpg na pasta Imagens); vai o papel da area de trabalho"
+fi
+# o papel de parede da paleta; com "manter", o que o xfdesktop mostra agora
+if [ -z "$origem" ] || [ ! -f "$origem" ]; then
+  prop=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep '/last-image$' | head -1 || true)
+  [ -n "$prop" ] && origem=$(xfconf-query -c xfce4-desktop -p "$prop" 2>/dev/null || true)
+fi
+if [ -n "$origem" ] && [ -f "$origem" ]; then
+  # o texto da tela e branco: o fundo escurece um pouco, e bem mais no modo
+  # claro, em que o papel da paleta e quase branco
+  if [ "$CTX_GTK_ESCURO" = 1 ]; then escurece=32; else escurece=48; fi
+  if [ "$CTX_LOGIN_DESFOQUE" = "sim" ]; then
+    # reduzir antes de desfocar deixa o desfoque rapido; o greeter estica de volta
+    convert "$origem[0]" -resize '1920x1200^' -blur 0x24 -fill black -colorize "$escurece%" \
+            -quality 88 "$d/fundo.jpg"
+  else
+    convert "$origem[0]" -resize '2560x1600>' -fill black -colorize "$((escurece - 10))%" \
+            -quality 90 "$d/fundo.jpg"
+  fi
+  echo "fundo: $(basename "$origem")$([ "$CTX_LOGIN_DESFOQUE" = "sim" ] && echo ', desfocado')"
+else
+  convert -size 1920x1200 "gradient:$CTX_PAPEL_COR_CIMA-$CTX_PAPEL_COR_BAIXO" \
+          -fill black -colorize "$([ "$CTX_GTK_ESCURO" = 1 ] && echo 20 || echo 42)%" "$d/fundo.jpg"
+  echo "nao achei o papel de parede; usando o degrade da paleta"
+fi
+
+# foto redonda. O svg do logo nao tem fundo, entao ganha um disco de vidro
+avatar="$CTX_LOGIN_AVATAR_ARQUIVO"
+mascara=( \( -size 256x256 xc:none -fill white -draw 'circle 128,128 128,1' \) -compose DstIn -composite )
+case "$avatar" in
+  *.svg)
+    convert -background none -density 384 "$avatar" -resize 140x140 \
+            -gravity center -background 'rgba(255,255,255,0.18)' -extent 256x256 \
+            "${mascara[@]}" "$d/avatar.png" ;;
+  *)
+    convert "$avatar[0]" -resize '256x256^' -gravity center -extent 256x256 \
+            "${mascara[@]}" "$d/avatar.png" ;;
+esac
+echo "foto: $(basename "$avatar")"
+'''
+
+[[passo]]
+tipo = "script"
+se = "login == sim"
+dizer = "levando para o sistema"
+corpo = '''
+d="$CTX_LOGIN_DIR"
+tema="$CTX_LOGIN_TEMA_DIR"
+# anotado antes de levar para o sistema; o desfazer apaga ou devolve cada um
+d3_antes "$CTX_LOGIN_RAIZ" "$tema" "$CTX_LOGIN_GREETER_CONF" "$CTX_LOGIN_LIGHTDM_CONF"
+# o root copia tudo primeiro para uma pasta nova dele, recusando link
+# simbolico, e instala de la: o que esta na pasta da pessoa nao chega ao
+# sistema por um atalho, nem trocado depois de conferido
+r="$(sudo -n mktemp -d)"
+trap 'sudo -n rm -rf -- "$r"' EXIT
+leva() {
+  if [ -L "$d/$1" ] || [ ! -f "$d/$1" ]; then echo "recusado: $d/$1" >&2; exit 1; fi
+  sudo -n cp -P --no-preserve=all -- "$d/$1" "$r/$1"
+  sudo -n test -f "$r/$1" -a ! -L "$r/$1" || { echo "recusado: $d/$1" >&2; exit 1; }
+}
+for f in fundo.jpg avatar.png gtk.css greeter.conf lightdm.conf; do leva "$f"; done
+sudo -n install -d -m 755 "$CTX_LOGIN_RAIZ" "$tema/gtk-3.0" \
+     "$(dirname "$CTX_LOGIN_GREETER_CONF")" "$(dirname "$CTX_LOGIN_LIGHTDM_CONF")"
+sudo -n install -o root -g root -m 644 "$r/fundo.jpg" "$r/avatar.png" "$CTX_LOGIN_RAIZ/"
+sudo -n install -o root -g root -m 644 -T "$r/gtk.css" "$tema/gtk-3.0/gtk.css"
+sudo -n install -o root -g root -m 644 -T "$r/greeter.conf" "$CTX_LOGIN_GREETER_CONF"
+sudo -n install -o root -g root -m 644 -T "$r/lightdm.conf" "$CTX_LOGIN_LIGHTDM_CONF"
+sudo -n rm -rf -- "$r"
+trap - EXIT
+
+# o lightdm le a configuracao uma vez so, ao iniciar
+saida="$(sudo -n lightdm --show-config 2>&1 || true)"
+if [ -z "$saida" ]; then
+  echo "configurado; nao deu para verificar sem root"
+elif printf '%s\n' "$saida" | grep -q 'greeter-session=lightdm-gtk-greeter'; then
+  echo "configurado e confirmado pelo lightdm"
+else
+  echo "atencao: o lightdm resolveu outro greeter, confira /etc/lightdm/lightdm.conf.d"
+fi
+echo "a tela de bloqueio muda na hora; a de login, no proximo reinicio"
+echo "se o login falhar, va ao modo texto com Ctrl+Alt+F2 e rode:"
+echo "  sudo rm $CTX_LOGIN_LIGHTDM_CONF && sudo systemctl restart lightdm"
+'''

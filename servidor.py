@@ -6,6 +6,7 @@ acessivel pela rede. Quem quiser usar de outro computador que faca tunel SSH.
 
 from __future__ import annotations
 
+import base64
 import hmac
 import html
 import json
@@ -80,6 +81,41 @@ def _uid_da_conexao(porta_cliente: int, porta_servidor: int) -> int | None:
                 and int(remoto.split(":")[1], 16) == porta_servidor):
             return uid
     return -1  # conexao que nao aparece: recusa
+
+
+def _papel_na_tela() -> Path | None:
+    """O arquivo que o xfdesktop mostra agora (as chaves do workspace0 primeiro)."""
+    try:
+        saida = subprocess.run(["xfconf-query", "-c", "xfce4-desktop", "-lv"],
+                               capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    candidatos = []
+    for linha in saida.splitlines():
+        chave, _, valor = linha.partition(" ")
+        if chave.endswith("/last-image"):
+            candidatos.append((0 if "/workspace0/" in chave else 1, valor.strip()))
+    for _, valor in sorted(candidatos):
+        if valor and Path(valor).is_file():
+            return Path(valor)
+    return None
+
+
+def _miniatura(origem: Path, nome: str) -> Path | None:
+    """Miniatura de 480 px, refeita quando a imagem muda."""
+    alvo = caminhos.ESTADO_DIR / "miniaturas" / f"{nome}.jpg"
+    try:
+        if alvo.is_file() and alvo.stat().st_mtime >= origem.stat().st_mtime \
+                and alvo.with_suffix(".origem").read_text() == str(origem):
+            return alvo
+        alvo.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["convert", f"{origem}[0]", "-resize", "480x270^", "-gravity", "center",
+                        "-extent", "480x270", "-strip", "-quality", "82", str(alvo)],
+                       capture_output=True, timeout=30, check=True)
+        alvo.with_suffix(".origem").write_text(str(origem))
+        return alvo
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def _nome_cookie(porta: int) -> str:
@@ -185,12 +221,12 @@ class Painel(BaseHTTPRequestHandler):
         self._envia(codigo, json.dumps(dados, ensure_ascii=False).encode(),
                     "application/json; charset=utf-8")
 
-    def corpo(self) -> dict:
+    def corpo(self, limite: int = 64_000) -> dict:
         try:
             tamanho = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return {}
-        if tamanho <= 0 or tamanho > 64_000:
+        if tamanho <= 0 or tamanho > limite:
             return {}
         try:
             dados = json.loads(self.rfile.read(tamanho))
@@ -269,6 +305,18 @@ class Painel(BaseHTTPRequestHandler):
         if rota == "/api/programas":
             self.json(programas.com_estado())
             return
+        # miniaturas para a previa da pagina: o papel que esta na tela e a
+        # imagem propria do login, que ficam fora da pasta web
+        if rota in ("/api/papel-atual.jpg", "/api/login-propria.jpg"):
+            from . import projeto
+            origem = (_papel_na_tela() if rota == "/api/papel-atual.jpg"
+                      else projeto._imagem_propria())
+            mini = _miniatura(origem, Path(rota).stem) if origem else None
+            if mini is None:
+                self._envia(404, b"sem imagem", "text/plain; charset=utf-8")
+            else:
+                self._envia(200, mini.read_bytes(), "image/jpeg")
+            return
 
         alvo = (caminhos.WEB / rota.lstrip("/")).resolve()
         # "/index.html/" resolve para a pagina: a regra vale pelo arquivo, nao pelo texto
@@ -287,7 +335,8 @@ class Painel(BaseHTTPRequestHandler):
             self._negado()
             return
         rota = self.path.split("?")[0]
-        corpo = self.corpo()
+        # a imagem do login vem inteira no JSON (ja reduzida pela pagina)
+        corpo = self.corpo(8_000_000 if rota == "/api/login-imagem" else 64_000)
 
         if rota == "/api/sair":
             # sair no meio do apt deixaria o dpkg pela metade
@@ -309,6 +358,9 @@ class Painel(BaseHTTPRequestHandler):
         if rota == "/api/instalar":
             self._instalar_tudo(corpo)
             return
+        if rota == "/api/login-imagem":
+            self._login_imagem(corpo)
+            return
         if rota == "/api/desfazer":
             from . import desfazer
             apagar = bool(corpo.get("apagar"))
@@ -328,6 +380,33 @@ class Painel(BaseHTTPRequestHandler):
         self._envia(404, b"nao encontrado", "text/plain; charset=utf-8")
 
     # ---- acoes -----------------------------------------------------------
+    def _login_imagem(self, corpo: dict) -> None:
+        """Guarda a imagem escolhida na pagina para o fundo do login. A pagina
+        manda um JPEG ja reduzido; aqui ele e conferido e regravado pelo
+        ImageMagick, so como JPEG, no lugar que a receita 80 procura."""
+        from . import projeto
+        try:
+            dados = base64.b64decode(str(corpo.get("imagem", "")), validate=True)
+        except (ValueError, TypeError):
+            dados = b""
+        if not dados.startswith(b"\xff\xd8\xff") or len(dados) > 6_000_000:
+            self.json({"ok": False, "erro": "a imagem nao chegou como JPEG (ou passou de 6 MB)"}, 400)
+            return
+        destino = projeto.LOGIN_PROPRIA
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temp = destino.with_name(".login-propria-envio.jpg")
+        try:
+            temp.write_bytes(dados)
+            subprocess.run(["convert", f"jpeg:{temp}[0]", "-auto-orient", "-resize", "2560x1600>",
+                            "-strip", "-quality", "90", f"jpeg:{destino}"],
+                           capture_output=True, timeout=60, check=True)
+        except (OSError, subprocess.SubprocessError):
+            self.json({"ok": False, "erro": "nao consegui ler essa imagem"}, 400)
+            return
+        finally:
+            temp.unlink(missing_ok=True)
+        self.json({"ok": True, "arquivo": str(destino)})
+
     def _aplicar(self, corpo: dict) -> None:
         pedido = config.filtrar(corpo)
         if not pedido:

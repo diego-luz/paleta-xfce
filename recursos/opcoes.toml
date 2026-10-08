@@ -142,3 +142,38 @@ titulo = "Efeitos (picom)"
 ajuda = "Sombras e cantos redondos nas janelas, e desfoque atras do que e translucido. Sem aceleracao de video (VM sem 3D) o picom roda leve, sem desfoque"
 grupo = "Janelas"
 nomes = { desligado = "Desligados (compositor do Xfce)", sombras = "So sombras e cantos", desfoque = "Desfoque e sombras" }
+
+
+[[opcao]]
+chave = "login"
+padrao = "sim"
+valores = ["sim", "nao"]
+titulo = "Tela de login da paleta"
+ajuda = "O papel de parede (ou uma imagem sua) no fundo, foto redonda e campos de vidro; vale tambem para a tela de bloqueio"
+grupo = "Tela de login"
+
+[[opcao]]
+chave = "login_fundo"
+padrao = "papel"
+valores = ["papel", "propria"]
+titulo = "Fundo da tela de login"
+ajuda = "O papel da area de trabalho, ou uma imagem sua: escolha pelo botao abaixo"
+grupo = "Tela de login"
+nomes = { "papel" = "O mesmo da area de trabalho", "propria" = "Minha imagem" }
+
+[[opcao]]
+chave = "login_desfoque"
+padrao = "sim"
+valores = ["sim", "nao"]
+titulo = "Fundo desfocado"
+ajuda = "A imagem fica embacada atras dos campos, como no macOS"
+grupo = "Tela de login"
+
+[[opcao]]
+chave = "login_usuarios"
+padrao = "campos"
+valores = ["campos", "lista"]
+titulo = "Como entrar"
+ajuda = "Digitar nome e senha, ou escolher o usuario numa lista"
+grupo = "Tela de login"
+nomes = { campos = "Nome e senha", lista = "Lista de usuarios" }

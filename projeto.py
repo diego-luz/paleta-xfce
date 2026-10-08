@@ -22,6 +22,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from . import caminhos
+
 # paleta e modo -> fundo, texto e as 16 cores do terminal (8 normais, 8 claras)
 #
 # Claro nao e so trocar o tema das janelas: o papel de parede e o terminal
@@ -97,8 +99,20 @@ TEMAS = {
 TELA_COMMIT = "a1fffc5bfab716bd022dd228ee96fe3965cdb33d"
 QOGIR_COMMIT = "c633057ba0d27a504b3255144071c9691ed0264a"
 
-# fora da pasta pessoal as receitas nao criam nada; o desfazer nao apaga la
-APAGAVEIS_FORA_DE_CASA: set[str] = set()
+# Tela de login: o lightdm nao le a pasta pessoal (no Debian ela e fechada),
+# entao o fundo, a foto e o tema vao para pastas do sistema
+LOGIN_RAIZ = "/usr/share/backgrounds/d3bian-paleta"
+LOGIN_TEMA = "/usr/share/themes/d3bian-paleta-login"
+LOGIN_GREETER = "/etc/xdg/lightdm/lightdm-gtk-greeter.conf.d/90-d3bian-paleta.conf"
+LOGIN_LIGHTDM = "/etc/lightdm/lightdm.conf.d/90-d3bian-paleta.conf"
+
+# Fora da pasta pessoal, o desfazer so apaga o que estiver aqui: o que a
+# receita da tela de login cria
+APAGAVEIS_FORA_DE_CASA: set[str] = {LOGIN_RAIZ, LOGIN_TEMA, LOGIN_GREETER, LOGIN_LIGHTDM}
+
+# Arquivo de sistema que as receitas alteram: so os da tela de login, que
+# podem existir de uma instalacao anterior
+RESTAURAVEIS_FORA_DE_CASA: set[str] = {LOGIN_GREETER, LOGIN_LIGHTDM}
 
 # a cor do Tela que mais se aproxima de cada paleta (o instalador dele aceita
 # nord, orange, green, entre outras)
@@ -131,6 +145,9 @@ RELOGIO = {
 POSICAO_BARRA = {"topo": "p=6;x=0;y=0", "baixo": "p=8;x=0;y=0"}
 
 PAPEIS_DIR = Path.home() / ".local/share/backgrounds/paleta"
+
+# a imagem que a pagina de ajustes guarda para o fundo do login
+LOGIN_PROPRIA = PAPEIS_DIR / "login-propria.jpg"
 
 # raio dos cantos das ilhas; o picom usa o mesmo, para o desfoque nao vazar
 RAIO = 14
@@ -353,7 +370,58 @@ def contexto(cfg: dict[str, str]) -> dict[str, str]:
         "favoritos": ";".join(FAVORITOS),
     }
     ctx.update(_picom(cfg))
+    ctx.update(_login(cfg, ctx))
     return ctx
+
+
+def _texto_sobre(cor: str) -> str:
+    """Preto ou branco, o que se le melhor sobre a cor."""
+    r, g, b = (int(cor[i:i + 2], 16) for i in (1, 3, 5))
+    return "#1d1d1d" if 0.299 * r + 0.587 * g + 0.114 * b > 150 else "#ffffff"
+
+
+def _imagem_propria() -> Path | None:
+    """A imagem escolhida na pagina; sem ela, login.jpg, .jpeg ou .png na
+    pasta de imagens da pessoa."""
+    if LOGIN_PROPRIA.is_file():
+        return LOGIN_PROPRIA
+    try:
+        pasta = subprocess.run(["xdg-user-dir", "PICTURES"], capture_output=True,
+                               text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pasta = ""
+    for base in [Path(pasta)] if pasta else [Path.home() / "Imagens", Path.home() / "Pictures"]:
+        for nome in ("login.jpg", "login.jpeg", "login.png", "login.JPG", "login.PNG"):
+            if (base / nome).is_file():
+                return base / nome
+    return None
+
+
+def _login(cfg: dict[str, str], ctx: dict[str, str]) -> dict[str, str]:
+    """O que a receita da tela de login precisa."""
+    face = Path.home() / ".face"
+    avatar = face if face.is_file() else caminhos.ARQUIVOS / "logos" / "debian-claro.svg"
+    # de onde vem o fundo: a imagem escolhida na pagina, ou o papel da area de
+    # trabalho (com "manter", o que o xfdesktop mostra; a receita procura)
+    fundo = ""
+    if cfg.get("login_fundo", "papel") == "propria":
+        fundo = str(_imagem_propria() or "")
+    elif cfg.get("papel", "degrade") != "manter":
+        fundo = ctx["papel_arquivo"]
+    return {
+        # montagem numa pasta da pessoa, fechada; o root copia de la
+        "login_dir": str(caminhos.ESTADO_DIR / "login"),
+        "login_raiz": LOGIN_RAIZ,
+        "login_tema_dir": LOGIN_TEMA,
+        "login_greeter_conf": LOGIN_GREETER,
+        "login_lightdm_conf": LOGIN_LIGHTDM,
+        "login_fundo_arquivo": fundo,
+        "login_avatar_arquivo": str(avatar),
+        "login_esconder_usuarios": "false" if cfg.get("login_usuarios") == "lista" else "true",
+        # o tema da paleta fica em ~/.themes, que o lightdm nao le: a tela usa
+        # o Adwaita escuro que vem dentro do GTK, com as cores da paleta por cima
+        "destaque_texto": _texto_sobre(ctx["destaque_cor"]),
+    }
 
 
 def verificacoes(add: Callable[..., None]) -> None:

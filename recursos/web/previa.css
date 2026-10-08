@@ -1,0 +1,113 @@
+/* Previa da area de trabalho e da tela de login, e a galeria do fundo do
+   login (previa.js). As cores de dentro da previa sao as da paleta escolhida,
+   nao as da pagina. */
+
+.previas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));
+  gap:20px;margin:0 0 20px}
+.pv-cartao h2{margin-bottom:12px}
+.pv-pe{color:var(--fraco);font-size:12px;margin-top:10px;line-height:1.5}
+
+/* ---- a tela, sempre em 16:9 ---- */
+.pv-tela{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:6px;
+  border:1px solid var(--borda);background:#2a2a2a;
+  font-family:Inter,"Cantarell",system-ui,sans-serif;container-type:inline-size}
+.sem-imagem{background:repeating-linear-gradient(135deg,#262a30 0 12px,#2d323a 12px 24px)!important}
+.sem-imagem::after{content:attr(data-texto);position:absolute;inset:13% 0 auto 0;text-align:center;
+  color:#c3cad6;font:600 11px var(--mono);letter-spacing:.04em;opacity:.8}
+.pv-mini-img.sem-imagem::after{inset:38% 0 auto 0;font-size:10px}
+
+/* barra unica, colada na borda */
+.pv-barra{position:absolute;left:0;right:0;height:6.5%;display:flex;align-items:center;gap:1.6%;
+  padding:0 1.4%;background:var(--pv-barra);color:var(--pv-texto);font-size:1.7cqw;
+  box-shadow:0 0 6px rgba(0,0,0,.25)}
+.pv-barra.topo{top:0}.pv-barra.baixo{bottom:0}
+.pv-esp{flex:1}
+.pv-bandeja{opacity:.75;letter-spacing:.2em}
+.pv-hora{white-space:nowrap}
+.pv-menu{display:flex;align-items:center;gap:.8cqw;white-space:nowrap}
+.pv-menu i{width:2.6cqw;aspect-ratio:1;border-radius:50%;background:var(--pv-acento);display:block}
+.pv-tarefas{display:flex;gap:.9cqw;align-items:center}
+.pv-tarefas i{width:3cqw;aspect-ratio:1;border-radius:24%;display:block;position:relative}
+.pv-tarefas i.ativo::after{content:"";position:absolute;left:30%;right:30%;bottom:-.7cqw;height:.35cqw;
+  border-radius:9px;background:var(--pv-acento)}
+.pv-botao{padding:.3cqw 1.4cqw;border-radius:4px;font-size:1.5cqw;opacity:.8;
+  background:rgba(127,127,127,.18)}
+.pv-botao.ativo{opacity:1;box-shadow:inset 0 -.3cqw 0 var(--pv-acento)}
+
+/* em ilhas: barra fina solta no topo e as janelas numa ilha embaixo */
+.pv-topo{position:absolute;left:1.2%;right:1.2%;top:1.6%;height:5.4%;border-radius:999px;
+  display:flex;align-items:center;gap:2%;padding:0 1.6%;color:var(--pv-texto);
+  font-size:1.8cqw;background:var(--pv-barra);opacity:.95;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.pv-ilha{position:absolute;bottom:2%;left:50%;transform:translateX(-50%);height:9%;
+  border-radius:14px;display:flex;align-items:center;padding:0 1.6%;background:var(--pv-ilha);
+  color:var(--pv-texto);box-shadow:0 3px 10px rgba(0,0,0,.28)}
+.pv-ilha .pv-tarefas i{width:4.4cqw}
+.pv-ilha .pv-botao{font-size:1.7cqw}
+
+/* icones na area de trabalho */
+.pv-icones-area{position:absolute;left:2%;display:flex;flex-direction:column;gap:3cqw;top:12%}
+.barra-baixo .pv-icones-area{top:4%}
+.pv-icone-area{display:flex;flex-direction:column;align-items:center;gap:.5cqw;width:9cqw;
+  color:#fff;font-size:1.3cqw;text-shadow:0 1px 2px rgba(0,0,0,.7);text-align:center}
+.pv-icone-area i{width:4.6cqw;aspect-ratio:1;border-radius:5px;display:block;
+  background:linear-gradient(#e8c26b,#c99a3c)}
+
+/* a janela */
+.pv-janela{position:absolute;left:16%;top:17%;width:54%;height:58%;border-radius:8px;
+  border:1px solid;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.45);
+  display:flex;flex-direction:column;font-size:1.6cqw}
+.pv-tit{height:11%;display:flex;align-items:center;justify-content:center;position:relative;
+  font-weight:700;font-size:1.7cqw}
+.pv-janela.compacta .pv-tit{height:8%;font-size:1.5cqw}
+.pv-botoes{position:absolute;right:3%;opacity:.7;letter-spacing:.1em}
+.pv-corpo{flex:1;display:flex;min-height:0}
+.pv-lado{width:32%;padding:3% 2%;display:flex;flex-direction:column;gap:4%}
+.pv-item{padding:3% 6%;border-radius:5px;opacity:.85;font-size:1.5cqw;white-space:nowrap}
+.pv-item.sel{background:var(--pv-acento);color:#fff;font-weight:700;opacity:1}
+.pv-area{flex:1;padding:5%;display:flex;flex-direction:column;gap:7%;position:relative}
+.pv-area i{display:block;height:5%;border-radius:3px}
+.pv-bt{position:absolute;right:5%;bottom:7%;background:var(--pv-acento);font-weight:700;
+  font-size:1.5cqw;padding:2% 6%;border-radius:6px}
+
+/* ---- tela de login ---- */
+.pv-login-fundo{position:absolute;inset:0;background-size:cover;background-position:center}
+.pv-login-fundo.desfocado{filter:blur(6px) brightness(.68);transform:scale(1.08)}
+.pv-login-fundo:not(.desfocado){filter:brightness(.78)}
+/* como a receita: no modo claro o fundo escurece mais, para o texto branco */
+.pv-login-fundo.claro.desfocado{filter:blur(6px) brightness(.52)}
+.pv-login-fundo.claro:not(.desfocado){filter:brightness(.6)}
+.pv-login-fundo.sem-imagem{filter:none;transform:none}
+.pv-login-topo{position:absolute;top:2.5%;right:2.5%;color:#fff;font-size:1.8cqw;
+  text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.pv-login-meio{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2.2%}
+.pv-foto{width:13%;aspect-ratio:1;border-radius:50%;margin-bottom:2%;
+  background:rgba(255,255,255,.18) url("/exemplos/debian-claro.svg") center/55% no-repeat;
+  box-shadow:0 0 0 1px rgba(255,255,255,.3),0 6px 18px rgba(0,0,0,.35)}
+.pv-nome{color:#fff;font-weight:600;font-size:2.3cqw;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.pv-campo{width:30%;padding:1.2% 2.4%;border-radius:999px;color:rgba(255,255,255,.65);
+  font-size:1.8cqw;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26)}
+.pv-campo:last-of-type{border-color:var(--pv-acento)}
+.pv-login-bts{display:flex;gap:4%;width:30%;justify-content:center;margin-top:1%}
+.pv-login-bts span{flex:1;text-align:center;padding:1% 0;border-radius:999px;font-size:1.7cqw;color:#fff}
+.pv-bt-vidro{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18)}
+.pv-bt-entrar{background:var(--pv-acento);font-weight:700}
+.pv-desligada{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,12,16,.78);
+  color:var(--fraco);font:600 12px var(--mono);text-align:center;padding:10%}
+
+/* ---- galeria do fundo do login ---- */
+.opcao.larga{flex-direction:column;align-items:stretch}
+.pv-galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;width:100%}
+.pv-mini{background:var(--painel2);border:1px solid var(--borda);border-radius:6px;padding:5px;
+  cursor:pointer;display:flex;flex-direction:column;gap:6px;color:var(--fraco);font:inherit;
+  font-size:11px;text-align:left;transition:border-color .15s,transform .15s}
+.pv-mini:hover{border-color:var(--fraco);transform:translateY(-1px)}
+.pv-mini[aria-pressed=true]{border-color:var(--acento);color:var(--texto);box-shadow:0 0 0 1px var(--acento)}
+.pv-mini-img{display:block;position:relative;aspect-ratio:16/9;border-radius:4px;
+  background-size:cover;background-position:center}
+.pv-mini-nome{line-height:1.3;padding:0 2px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-galeria-caixa{display:flex;flex-direction:column;gap:10px;width:100%}
+.pv-escolher{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pv-escolher .bt{padding:7px 14px;font-size:12px}
+.pv-aviso{color:var(--fraco);font-size:12px}
+.pv-aviso.erro{color:var(--erro)}

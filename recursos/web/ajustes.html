@@ -1,7 +1,9 @@
 <title>Ajustes - @@NOME@@</title>
 <meta name="projeto" content="@@NOME@@" data-versao="@@VERSAO@@">
 <link rel="stylesheet" href="estilo.css">
+<link rel="stylesheet" href="previa.css">
 <script src="comum.js"></script>
+<script src="previa.js"></script>
 
 <div class="estado"></div>
 
@@ -30,6 +32,9 @@
     Se quiser, ajuste as opções antes de instalar. Dá para mudar tudo depois.
   </p>
 </div>
+
+<!-- como fica a area de trabalho e a tela de login com as opcoes marcadas (previa.js) -->
+<div class="previas" id="previas" hidden></div>
 
 <!-- um cartao por grupo do recursos/opcoes.toml, desenhado pelo script abaixo -->
 <div class="grupos" id="grupos"><p class="sub">Carregando…</p></div>
@@ -131,6 +136,13 @@ function linhaDaOpcao(o){
   const txt = criar("div");
   const dica = criar("div", "dica", o.ajuda || "");
   txt.append(criar("div", "rot", o.titulo), dica);
+  // escolha por imagem: uma galeria de miniaturas, embaixo do texto
+  const galeria = Previa.galeria(o, estado, v => { estado[o.chave] = v; desenhar(); });
+  if (galeria){
+    linha.classList.add("larga");
+    linha.append(txt, galeria);
+    return linha;
+  }
   // como fica o valor marcado, numa imagem que vem no pacote
   const exemplo = (o.exemplos || {})[estado[o.chave]];
   if (exemplo){
@@ -164,6 +176,8 @@ function linhaDaOpcao(o){
     conferir();
     linha.append(campo, lista);
   } else if (o.valores.length <= 3){
+    // botoes de rotulo comprido apertariam o texto: vao para baixo dele
+    if (o.valores.map(v => rotulo(v, o)).join("").length > 26) linha.classList.add("larga");
     const grupo = criar("div", "seg");
     o.valores.forEach(v => {
       const b = criar("button", "", rotulo(v, o));
@@ -199,6 +213,7 @@ function desenharMudancas(){
 }
 
 function desenhar(){
+  Previa.desenhar(estado);
   desenharOpcoes();
   desenharMudancas();
 }
