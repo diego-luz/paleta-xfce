@@ -17,7 +17,7 @@
 > de parede, no claro ou no escuro. Só Python da biblioteca padrão — nada de pip.
 
 ```sh
-git clone https://git.saberdl.dev.br/d3bian-temas/paleta-xfce.git d3bian_init_paleta_xfce
+git clone https://github.com/diego-luz/paleta-xfce.git d3bian_init_paleta_xfce
 python3 -m d3bian_init_paleta_xfce        # pede a senha uma vez e abre o painel
 ```
 
@@ -38,11 +38,10 @@ python3 -m d3bian_init_paleta_xfce        # pede a senha uma vez e abre o painel
 - **Papel de parede** desenhado na hora, liso ou em degradê, com as cores da paleta
 - **Encaixe de janelas** por atalho, bordas mais largas, e nova janela e nova aba no clique direito do terminal
 - **Barra em ilhas**, se quiser: barra fina solta no topo e as janelas abertas numa
-  ilha embaixo, com cantos redondos (vinda do [oasis-xfce](https://git.saberdl.dev.br/d3bian-temas/oasis-xfce))
+  ilha embaixo, com cantos redondos (vinda do [oasis-xfce](https://github.com/diego-luz/oasis-xfce))
 - **Efeitos com o picom**, se quiser: sombras, cantos redondos e desfoque, em modo
   leve onde não há aceleração de vídeo
 - **Programas úteis**: uma lista pronta do repositório oficial do Debian, conforme o hardware
-- **Voltar ao que era antes** com o diário de alterações do [modelo](https://git.saberdl.dev.br/d3bian-temas/modelo)
 
 <!-- imagens: gerado a partir do teste num Debian 13; refazer, nao editar a mao -->
 ## Telas
@@ -78,21 +77,12 @@ python3 -m d3bian_init_paleta_xfce        # pede a senha uma vez e abre o painel
 ## Família d3bian-init
 
 Todos com o mesmo motor e o mesmo jeito de usar: um painel local, só Python da biblioteca padrão, e "voltar ao que era antes".
-Os de terminal ficam em [d3bian-terminal](https://git.saberdl.dev.br/d3bian-terminal); os temas e o modelo, em [d3bian-temas](https://git.saberdl.dev.br/d3bian-temas).
 
 | | Projeto | O que faz |
 |---|---|---|
-| 💻 | [terminal](https://git.saberdl.dev.br/d3bian-terminal/terminal) · [terminal-kde](https://git.saberdl.dev.br/d3bian-terminal/terminal-kde) | Fish, Oh My Posh, Nerd Font e cores (xfce4-terminal/GNOME Terminal ou Konsole) |
-| 💻 | [zsh](https://git.saberdl.dev.br/d3bian-terminal/zsh) · [zsh-kde](https://git.saberdl.dev.br/d3bian-terminal/zsh-kde) | Zsh com sugestões e realce, Oh My Posh, Nerd Font e cores |
-| 💻 | [bash](https://git.saberdl.dev.br/d3bian-terminal/bash) · [bash-kde](https://git.saberdl.dev.br/d3bian-terminal/bash-kde) | O bash de sempre, com sugestões e realce, Oh My Posh e Nerd Font |
-| 🎨 | [bigsur-kde](https://git.saberdl.dev.br/d3bian-temas/bigsur-kde) · [mactahoe-kde](https://git.saberdl.dev.br/d3bian-temas/mactahoe-kde) | Cara de macOS (Big Sur ou Tahoe) no KDE Plasma 6 |
-| 🎨 | [fluent-kde](https://git.saberdl.dev.br/d3bian-temas/fluent-kde) · [chromeos-kde](https://git.saberdl.dev.br/d3bian-temas/chromeos-kde) | Cara de Windows 11 ou de ChromeOS no KDE Plasma 6 |
-| 🎨 | [catppuccin-kde](https://git.saberdl.dev.br/d3bian-temas/catppuccin-kde) · [graphite-kde](https://git.saberdl.dev.br/d3bian-temas/graphite-kde) · [layan-kde](https://git.saberdl.dev.br/d3bian-temas/layan-kde) · [orchis-kde](https://git.saberdl.dev.br/d3bian-temas/orchis-kde) | Temas Catppuccin, Graphite, Layan e Orchis no KDE Plasma 6 |
-| 🪟 | [bigsur-xfce](https://git.saberdl.dev.br/d3bian-temas/bigsur-xfce) · [bigsur-minimalista-xfce](https://git.saberdl.dev.br/d3bian-temas/bigsur-minimalista-xfce) | Cara de macOS Big Sur no Xfce, completo ou minimalista |
-| 🪟 | [minimal-xfce](https://git.saberdl.dev.br/d3bian-temas/minimal-xfce) · **paleta-xfce** | Xfce enxuto, ou numa paleta só (Nord, Gruvbox, Everforest) |
-| 🪟 | [oasis-xfce](https://git.saberdl.dev.br/d3bian-temas/oasis-xfce) | Xfce em ilhas, com desfoque do picom, grade no rofi e dunas, só com o repositório |
-| 🍎 | [tahoe-gnome](https://git.saberdl.dev.br/d3bian-temas/tahoe-gnome) | Cara de macOS Tahoe no GNOME 48 |
-| 🧩 | [modelo](https://git.saberdl.dev.br/d3bian-temas/modelo) | O modelo de onde todos saem: crie o seu próprio d3bian-init |
+| 🪟 | [bigsur-xfce](https://github.com/diego-luz/bigsur-xfce) · [bigsur-minimalista-xfce](https://github.com/diego-luz/bigsur-minimalista-xfce) | Cara de macOS Big Sur no Xfce, completo ou minimalista |
+| 🪟 | [minimal-xfce](https://github.com/diego-luz/minimal-xfce) · **paleta-xfce** | Xfce enxuto, ou numa paleta só (Nord, Gruvbox, Everforest) |
+| 🪟 | [oasis-xfce](https://github.com/diego-luz/oasis-xfce) | Xfce em ilhas, com desfoque do picom, grade no rofi e dunas, só com o repositório |
 
 Os temas Xfce (🪟) são um por conta: com outro instalado, a instalação é recusada, e `aplicar --trocar` (ou o botão no painel) volta o outro e instala este ([detalhes](docs/uso.md#um-tema-xfce-por-vez)).
 

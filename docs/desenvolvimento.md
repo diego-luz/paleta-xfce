@@ -3,7 +3,7 @@
 [← voltar ao README](../README.md)
 
 Painel em Python puro (só a biblioteca padrão) com HTML/JS sem dependências.
-O motor, o servidor e as telas comuns vêm do [modelo](https://git.saberdl.dev.br/d3bian-temas/modelo);
+O motor, o servidor e as telas comuns vêm do modelo;
 os detalhes deles e as armadilhas conhecidas estão em [nucleo.md](nucleo.md).
 
 ## Receitas
@@ -29,7 +29,7 @@ Paletas, nomes de tema e o jeito de instalar cada um ficam no `projeto.py`:
 
 ## Ilhas, picom e encaixe
 
-Vindos do [oasis-xfce](https://git.saberdl.dev.br/d3bian-temas/oasis-xfce), com os
+Vindos do [oasis-xfce](https://github.com/diego-luz/oasis-xfce), com os
 mesmos arquivos em `recursos/arquivos`:
 
 | Arquivo | O que faz |
