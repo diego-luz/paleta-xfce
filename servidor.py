@@ -83,6 +83,16 @@ def _uid_da_conexao(porta_cliente: int, porta_servidor: int) -> int | None:
     return -1  # conexao que nao aparece: recusa
 
 
+def _no_wsl() -> bool:
+    try:
+        return "microsoft" in Path("/proc/sys/kernel/osrelease").read_text().lower()
+    except OSError:
+        return False
+
+
+NO_WSL = _no_wsl()
+
+
 def _papel_na_tela() -> Path | None:
     """O arquivo que o xfdesktop mostra agora (as chaves do workspace0 primeiro)."""
     try:
@@ -159,7 +169,13 @@ class Painel(BaseHTTPRequestHandler):
     def _mesmo_usuario(self) -> bool:
         """So a conta que abriu o painel fala com ele: outra conta da maquina
         tambem alcanca 127.0.0.1, entao a conexao e conferida pelo dono."""
-        return _uid_da_conexao(self.client_address[1], self._porta()) in (os.getuid(), None)
+        uid = _uid_da_conexao(self.client_address[1], self._porta())
+        if uid in (os.getuid(), None):
+            return True
+        # no WSL o navegador roda no Windows e a conexao chega pelo repasse do
+        # WSL: do root ou sem ponta do lado Linux. Ai quem guarda e o link de
+        # uso unico e o cookie; outra conta do Linux continua recusada
+        return NO_WSL and uid in (0, -1)
 
     def _post_ok(self) -> bool:
         porta = self._porta()
