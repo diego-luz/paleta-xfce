@@ -25,6 +25,30 @@ python3 -m d3bian_init_paleta_xfce        # pede a senha uma vez e abre o painel
   <img src="docs/imagens/resultado-instalado.jpg" alt="Logo depois de instalar, com as opções padrão" width="820">
 </div>
 
+<details>
+<summary><b>In English</b></summary>
+
+A local control panel, opened in your browser, that puts the whole Xfce desktop on
+Debian **in one palette**: Nord, Gruvbox or Everforest on the windows, title bars,
+icons, terminal colors and a wallpaper drawn on the fly, light or dark. Optional
+island-style panels and picom effects (shadows, rounded corners, blur).
+
+- **Packages from the official Debian repository**; what Debian does not package
+  comes from upstream at a fixed version: the window themes with the SHA-256
+  checked, the Tela and Qogir icons at a fixed Git commit.
+- **Safe to try**: every change is backed up and journaled; *Restore* puts your
+  desktop back the way it was.
+- **Python standard library only**: no pip, nothing to build.
+
+```sh
+git clone https://github.com/diego-luz/paleta-xfce.git d3bian_init_paleta_xfce
+python3 -m d3bian_init_paleta_xfce        # asks for your password once, opens the panel
+```
+
+The interface and the documentation are in Brazilian Portuguese.
+
+</details>
+
 ---
 
 ## O que ele faz
